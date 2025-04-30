@@ -1,19 +1,25 @@
 use s3s::route::S3Route;
 use s3s::{Body, S3Request, S3Response, S3Result};
 
+use log::info;
 use axum::http;
-use http::{Extensions, HeaderMap, Method, Uri, StatusCode};
+use http::{Extensions, HeaderMap, Method, StatusCode, Uri};
+use std::net::SocketAddr;
 use tower::Service;
+use tower_http::trace::TraceLayer;
+use tracing_subscriber::EnvFilter;
 
 pub struct CustomRoute {
+    prefix: String,
     router: axum::Router,
 }
 
 impl CustomRoute {
     #[must_use]
-    pub fn build() -> Self {
+    pub fn build(prefix: &str) -> Self {
         Self {
-            router: self::handlers::register(),
+            prefix: prefix.to_string(),
+            router: self::handlers::register(prefix),
         }
     }
 }
@@ -58,8 +64,9 @@ impl S3Route for CustomRoute {
         _extensions: &mut Extensions,
     ) -> bool {
         let path = uri.path();
-        let prefix = const_str::concat!(self::handlers::PREFIX, "/");
-        path.starts_with(prefix)
+        println!("path: {}", path);
+        let prefix = self.prefix.clone() + "/";
+        path.starts_with(&prefix)
     }
 
     async fn check_access(&self, req: &mut S3Request<Body>) -> S3Result<()> {
@@ -117,9 +124,7 @@ mod handlers {
         response::Json(json)
     }
 
-    pub const PREFIX: &str = "/custom";
-
-    pub fn register() -> Router {
+    pub fn register(prefix: &str) -> Router {
         let router = Router::new()
             .route("/echo", post(echo))
             .route("/hello", get(hello))
@@ -127,8 +132,36 @@ mod handlers {
             .route("/show_query", get(show_query))
             .route("/show_json", post(show_json));
 
-        Router::new().nest(PREFIX, router)
+        Router::new().nest(prefix, router)
     }
 }
 
-fn main() {}
+#[tokio::main]
+async fn main() {
+    // initialize tracing
+    tracing_subscriber::fmt()
+        .pretty()
+        // This allows you to use, e.g., `RUST_LOG=info` or `RUST_LOG=debug`
+        // when running the app to set log levels.
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .or_else(|_| EnvFilter::try_new("axum_tracing_example=error,tower_http=warn"))
+                .unwrap(),
+        )
+        .init();
+
+    // build our application with a route
+    let custom_route = CustomRoute::build("/foo");
+
+    // run our app with hyper, listening globally on port 3000
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    info!("listening on {}", listener.local_addr().unwrap());
+
+    axum::serve(
+        listener,
+        custom_route.router.layer(TraceLayer::new_for_http()),
+    )
+    .await
+    .unwrap();
+}

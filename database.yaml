@@ -1,0 +1,18 @@
+buckets:
+  - name: overturemaps-us-west-2
+    region: us-west-2
+    alias: overture
+  - name: bar
+    region: us-east-2
+    alias: bar
+
+credentials:
+  - access_key_id: foo
+    secret_access_key: bar
+    user_id: bob
+  - access_key_id: abc
+    secret_access_key: def
+    user_id: alice
+  - access_key_id: foo1
+    secret_access_key: bar2
+    user_id: bob

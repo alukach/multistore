@@ -1,12 +1,12 @@
 mod auth;
-mod database;
+mod data_source;
 mod error;
 mod s3;
 mod server;
 mod utils;
 
-use auth::YAMLAuth;
-use database::YAMLDb;
+use auth::yaml_auth::YAMLAuth;
+use data_source::yaml_db::YAMLDb;
 use error::Result;
 use s3::S3Interface;
 use s3s::service::S3ServiceBuilder;

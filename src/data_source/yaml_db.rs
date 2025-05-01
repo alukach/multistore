@@ -5,7 +5,7 @@ use s3s::dto;
 use std::sync::Arc;
 
 pub struct InMemoryDataSourceRegistry {
-    buckets: Vec<DataSource>,
+    data_sources: Vec<DataSource>,
 }
 
 impl InMemoryDataSourceRegistry {
@@ -13,14 +13,13 @@ impl InMemoryDataSourceRegistry {
         let file = std::fs::File::open(path).unwrap();
         let reader = std::io::BufReader::new(file);
         let config: serde_yaml::Value = serde_yaml::from_reader(reader).unwrap();
-        let buckets = config["buckets"].as_sequence().unwrap();
-        let buckets = buckets
+        let data_sources = config["data-sources"].as_sequence().unwrap();
+        let data_sources = data_sources
             .iter()
             .map(|v| {
                 let name = v["name"].as_str().unwrap().to_string();
                 let url = v["url"].as_str().or(Some(&name)).unwrap().to_string();
                 let region = v["region"].as_str().unwrap().to_string();
-                let public = v["public"].as_bool().unwrap_or(false);
                 let creation_date = Some(dto::Timestamp::from(std::time::SystemTime::now()));
 
                 DataSource {
@@ -28,22 +27,25 @@ impl InMemoryDataSourceRegistry {
                     url,
                     region,
                     creation_date,
-                    public,
                 }
             })
             .collect();
-        Self { buckets }
+        Self { data_sources }
     }
 }
 
 #[async_trait::async_trait]
 impl DataSourceRegistry for InMemoryDataSourceRegistry {
     async fn list_buckets(&self, _access_key: Option<&String>) -> Vec<dto::Bucket> {
-        self.buckets.iter().cloned().map(Into::into).collect()
+        self.data_sources.iter().cloned().map(Into::into).collect()
     }
 
     async fn get_object_store(&self, bucket_name: &str) -> Result<Arc<dyn ObjectStore>, Error> {
-        let bucket = self.buckets.iter().find(|b| b.name == bucket_name).unwrap();
+        let bucket = self
+            .data_sources
+            .iter()
+            .find(|b| b.name == bucket_name)
+            .unwrap();
         Ok(bucket.try_into()?)
     }
 }

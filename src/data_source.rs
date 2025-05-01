@@ -1,7 +1,5 @@
 use crate::error::Error;
 use object_store::{ObjectStore, parse_url_opts};
-/// A data source registery is the tooling to track the existence of data sources (ie
-/// various Object Storage backends).
 use s3s::dto;
 use std::sync::Arc;
 use url::Url;
@@ -13,12 +11,12 @@ pub struct DataSource {
     region: String,
     url: String,
     creation_date: Option<dto::Timestamp>,
-    public: bool,
 }
 
 impl DataSource {}
 
-/// A bucket registry
+/// A data source registery is the tooling to track the existence of data sources (ie
+/// various Object Storage backends).
 #[async_trait::async_trait]
 pub trait DataSourceRegistry {
     async fn list_buckets(&self, access_key: Option<&String>) -> Vec<dto::Bucket>;
@@ -44,8 +42,9 @@ impl TryFrom<&DataSource> for Arc<dyn ObjectStore> {
         let options = [
             ("region", source.region.clone()),
             // ("skip_signature", source.public.to_string()),
-            ("access_key_id", "TODO: get from env".to_string()),
-            ("secret_access_key", "TODO: get from env".to_string()),
+            // TODO: get temporary credentials from assumed role
+            // ("access_key_id", "TODO: get from env".to_string()),
+            // ("secret_access_key", "TODO: get from env".to_string()),
         ];
         let (object_store, _path) = parse_url_opts(&url, options).unwrap();
         Ok(Arc::new(object_store))

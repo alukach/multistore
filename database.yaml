@@ -1,4 +1,4 @@
-buckets:
+data-sources:
   - name: overture
     region: us-west-2
     url: s3://overturemaps-us-west-2

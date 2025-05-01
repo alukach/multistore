@@ -1,10 +1,10 @@
 buckets:
-  - name: overturemaps-us-west-2
+  - name: overture
     region: us-west-2
-    alias: overture
+    url: s3://overturemaps-us-west-2
   - name: bar
     region: us-east-2
-    alias: bar
+    url: s3://bar
 
 credentials:
   - access_key_id: foo

@@ -2,9 +2,9 @@ data-sources:
   - name: overture
     region: us-west-2
     url: s3://overturemaps-us-west-2
-  - name: bar
-    region: us-east-2
-    url: s3://bar
+    credentials:
+      access_key_id: ...
+      secret_access_key: ...
 
 credentials:
   - access_key_id: foo

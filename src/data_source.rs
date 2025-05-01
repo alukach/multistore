@@ -6,11 +6,37 @@ use url::Url;
 pub mod yaml_db;
 
 #[derive(Debug, Clone)]
+pub struct Credentials {
+    access_key_id: String,
+    secret_access_key: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct IAMRole {
+    iam_role_arn: String,
+}
+
+impl TryFrom<IAMRole> for Credentials {
+    type Error = Error;
+
+    fn try_from(_role: IAMRole) -> Result<Self, Self::Error> {
+        todo!("get temporary credentials from assumed role")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CredentialsOrIAMRole {
+    Credentials(Credentials),
+    IAMRole(IAMRole),
+}
+
+#[derive(Debug, Clone)]
 pub struct DataSource {
     name: String,
     region: String,
     url: String,
     creation_date: Option<dto::Timestamp>,
+    credentials: CredentialsOrIAMRole,
 }
 
 impl DataSource {}
@@ -39,12 +65,15 @@ impl TryFrom<&DataSource> for Arc<dyn ObjectStore> {
 
     fn try_from(source: &DataSource) -> Result<Self, Self::Error> {
         let url = Url::parse(&source.url).unwrap();
+        let credentials = match source.credentials.clone() {
+            CredentialsOrIAMRole::Credentials(credentials) => credentials,
+            CredentialsOrIAMRole::IAMRole(role) => role.try_into()?,
+        };
         let options = [
             ("region", source.region.clone()),
             // ("skip_signature", source.public.to_string()),
-            // TODO: get temporary credentials from assumed role
-            // ("access_key_id", "TODO: get from env".to_string()),
-            // ("secret_access_key", "TODO: get from env".to_string()),
+            ("access_key_id", credentials.access_key_id.clone()),
+            ("secret_access_key", credentials.secret_access_key.clone()),
         ];
         let (object_store, _path) = parse_url_opts(&url, options).unwrap();
         Ok(Arc::new(object_store))

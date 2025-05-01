@@ -1,4 +1,4 @@
-use crate::data_source::{Credentials, CredentialsOrIAMRole, DataSource, DataSourceRegistry};
+use crate::data_source::{DataSource, DataSourceRegistry};
 use crate::error::Error;
 use object_store::ObjectStore;
 use s3s::dto;
@@ -28,10 +28,15 @@ impl InMemoryDataSourceRegistry {
                     url,
                     region,
                     creation_date,
-                    credentials: CredentialsOrIAMRole::Credentials(Credentials {
-                        access_key_id: credentials["access_key_id"].as_str().unwrap().to_string(),
-                        secret_access_key: credentials["secret_access_key"].as_str().unwrap().to_string(),
-                    }),
+                    credentials: credentials
+                        .iter()
+                        .map(|(k, v)| {
+                            (
+                                k.as_str().unwrap().to_string(),
+                                v.as_str().unwrap().to_string(),
+                            )
+                        })
+                        .collect(),
                 }
             })
             .collect();

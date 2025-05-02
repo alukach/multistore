@@ -1,7 +1,6 @@
 use crate::conversion::S3ObjectMeta;
 use crate::data_source::DataSourceRegistry;
 use futures_util::TryStreamExt;
-use object_store::path::Path;
 use s3s::dto;
 use s3s::{S3, S3Request, S3Response, S3Result};
 use s3s::{S3Error, S3ErrorCode};
@@ -41,15 +40,12 @@ impl S3 for S3Interface {
     ) -> S3Result<S3Response<dto::ListObjectsV2Output>> {
         // TODO: Support pagination
         let bucket_name = req.input.bucket;
-        let object_store = match self.source.get_object_store(&bucket_name).await {
+        let (object_store, path) = match self.source.get_object_store(&bucket_name).await {
             Ok(object_store) => object_store,
             Err(e) => {
                 println!("Failed to get object store: {:?}", e);
                 return Err(S3Error::new(S3ErrorCode::InternalError));
             }
-        };
-        let Ok(path) = Path::from_url_path(req.input.prefix.as_ref().unwrap()) else {
-            return Err(S3Error::new(S3ErrorCode::InternalError));
         };
 
         let objects = object_store

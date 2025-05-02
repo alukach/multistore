@@ -1,8 +1,8 @@
 use crate::error::Error;
+use object_store::path::Path;
 use object_store::{ObjectStore, parse_url_opts};
 use s3s::dto;
 use std::collections::HashMap;
-use std::sync::Arc;
 use url::Url;
 pub mod yaml_db;
 
@@ -23,7 +23,10 @@ impl DataSource {}
 pub trait DataSourceRegistry {
     async fn list_data_sources(&self, access_key: Option<&String>) -> Vec<DataSource>;
 
-    async fn get_object_store(&self, bucket_name: &str) -> Result<Arc<dyn ObjectStore>, Error>;
+    async fn get_object_store(
+        &self,
+        bucket_name: &str,
+    ) -> Result<(Box<dyn ObjectStore>, Path), Error>;
 }
 
 impl From<DataSource> for dto::Bucket {
@@ -36,7 +39,7 @@ impl From<DataSource> for dto::Bucket {
     }
 }
 
-impl TryFrom<DataSource> for Arc<dyn ObjectStore> {
+impl TryFrom<DataSource> for (Box<dyn ObjectStore>, Path) {
     type Error = Error;
 
     fn try_from(source: DataSource) -> Result<Self, Self::Error> {
@@ -51,7 +54,7 @@ impl TryFrom<DataSource> for Arc<dyn ObjectStore> {
                 .map(|(k, v)| (k.as_str(), v.clone())),
         );
 
-        let (object_store, _path) = parse_url_opts(&url, options).unwrap();
-        Ok(Arc::new(object_store))
+        let (object_store, path) = parse_url_opts(&url, options).unwrap();
+        Ok((object_store, path))
     }
 }

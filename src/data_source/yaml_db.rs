@@ -1,8 +1,7 @@
 use crate::data_source::{DataSource, DataSourceRegistry};
 use crate::error::Error;
-use object_store::ObjectStore;
+use object_store::{ObjectStore, path::Path};
 use s3s::dto;
-use std::sync::Arc;
 
 pub struct InMemoryDataSourceRegistry {
     data_sources: Vec<DataSource>,
@@ -53,7 +52,10 @@ impl DataSourceRegistry for InMemoryDataSourceRegistry {
         self.data_sources.clone()
     }
 
-    async fn get_object_store(&self, bucket_name: &str) -> Result<Arc<dyn ObjectStore>, Error> {
+    async fn get_object_store(
+        &self,
+        bucket_name: &str,
+    ) -> Result<(Box<dyn ObjectStore>, Path), Error> {
         let Some(datasource) = self.data_sources.iter().find(|b| b.name == bucket_name) else {
             return Err(Error::from_string("Bucket not found"));
         };

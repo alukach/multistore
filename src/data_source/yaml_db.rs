@@ -13,14 +13,25 @@ impl InMemoryDataSourceRegistry {
         let file = std::fs::File::open(path).unwrap();
         let reader = std::io::BufReader::new(file);
         let config: serde_yaml::Value = serde_yaml::from_reader(reader).unwrap();
-        let data_sources = config["data-sources"].as_sequence().unwrap();
-        let data_sources = data_sources
+        let data_sources = config["data-sources"]
+            .as_sequence()
+            .unwrap()
             .iter()
             .map(|v| {
                 let name = v["name"].as_str().unwrap().to_string();
                 let url = v["url"].as_str().or(Some(&name)).unwrap().to_string();
                 let region = v["region"].as_str().unwrap().to_string();
-                let credentials = v["credentials"].as_mapping().unwrap();
+                let credentials = v["credentials"]
+                    .as_mapping()
+                    .unwrap()
+                    .iter()
+                    .map(|(k, v)| {
+                        (
+                            k.as_str().unwrap().to_string(),
+                            v.as_str().unwrap().to_string(),
+                        )
+                    })
+                    .collect();
                 let creation_date = Some(dto::Timestamp::from(std::time::SystemTime::now()));
 
                 DataSource {
@@ -28,15 +39,7 @@ impl InMemoryDataSourceRegistry {
                     url,
                     region,
                     creation_date,
-                    credentials: credentials
-                        .iter()
-                        .map(|(k, v)| {
-                            (
-                                k.as_str().unwrap().to_string(),
-                                v.as_str().unwrap().to_string(),
-                            )
-                        })
-                        .collect(),
+                    credentials,
                 }
             })
             .collect();

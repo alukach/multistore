@@ -1,5 +1,5 @@
-use crate::data_source::DataSourceRegistry;
 use crate::conversion::S3ObjectMeta;
+use crate::data_source::DataSourceRegistry;
 use futures_util::TryStreamExt;
 use object_store::path::Path;
 use s3s::dto;
@@ -45,17 +45,15 @@ impl S3 for S3Interface {
             Ok(object_store) => object_store,
             Err(e) => {
                 println!("Failed to get object store: {:?}", e);
-                return Err(S3Error::new(S3ErrorCode::UnexpectedContent));
+                return Err(S3Error::new(S3ErrorCode::InternalError));
             }
         };
-
         let Ok(path) = Path::from_url_path(req.input.prefix.as_ref().unwrap()) else {
-            return Err(S3Error::new(S3ErrorCode::UnexpectedContent));
+            return Err(S3Error::new(S3ErrorCode::InternalError));
         };
 
-        let objects = object_store.list(Some(&path));
-
-        let objects = objects
+        let objects = object_store
+            .list(Some(&path))
             .map_ok(|f| S3ObjectMeta::from(f).into())
             .try_collect()
             .await

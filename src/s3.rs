@@ -25,13 +25,20 @@ impl S3 for S3Interface {
         req: S3Request<dto::ListBucketsInput>,
     ) -> S3Result<S3Response<dto::ListBucketsOutput>> {
         let access_key = req.credentials.map(|c| c.access_key.clone());
-        let buckets = self.source.list_data_sources(access_key.as_ref()).await;
-        let output = dto::ListBucketsOutput {
-            buckets: Some(buckets.into_iter().map(Into::into).collect()),
+
+        let buckets = self
+            .source
+            .list_data_sources(access_key.as_ref())
+            .await
+            .into_iter()
+            .map(Into::into)
+            .collect();
+
+        Ok(S3Response::new(dto::ListBucketsOutput {
+            buckets: Some(buckets),
             owner: None,
             ..Default::default()
-        };
-        Ok(S3Response::new(output))
+        }))
     }
 
     async fn list_objects_v2(

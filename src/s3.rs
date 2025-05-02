@@ -1,4 +1,5 @@
 use crate::data_source::DataSourceRegistry;
+use crate::conversion::S3ObjectMeta;
 use futures_util::TryStreamExt;
 use object_store::path::Path;
 use s3s::dto;
@@ -22,12 +23,12 @@ impl S3Interface {
 impl S3 for S3Interface {
     async fn list_buckets(
         &self,
-        _req: S3Request<dto::ListBucketsInput>,
+        req: S3Request<dto::ListBucketsInput>,
     ) -> S3Result<S3Response<dto::ListBucketsOutput>> {
-        let access_key = _req.credentials.map(|c| c.access_key.clone());
-        let buckets = self.source.list_buckets(access_key.as_ref()).await;
+        let access_key = req.credentials.map(|c| c.access_key.clone());
+        let buckets = self.source.list_data_sources(access_key.as_ref()).await;
         let output = dto::ListBucketsOutput {
-            buckets: Some(buckets),
+            buckets: Some(buckets.into_iter().map(Into::into).collect()),
             owner: None,
             ..Default::default()
         };
@@ -38,6 +39,7 @@ impl S3 for S3Interface {
         &self,
         req: S3Request<dto::ListObjectsV2Input>,
     ) -> S3Result<S3Response<dto::ListObjectsV2Output>> {
+        // TODO: Support pagination
         let bucket_name = req.input.bucket;
         let object_store = match self.source.get_object_store(&bucket_name).await {
             Ok(object_store) => object_store,
@@ -51,18 +53,10 @@ impl S3 for S3Interface {
             return Err(S3Error::new(S3ErrorCode::UnexpectedContent));
         };
 
-        let objects = object_store
-            .list(Some(&path))
-            .map_ok(|f| dto::Object {
-                key: Some(f.location.to_string()),
-                size: Some(f.size as i64),
-                last_modified: Some(dto::Timestamp::from(std::time::SystemTime::from(
-                    f.last_modified,
-                ))),
-                e_tag: f.e_tag,
-                // version: f.version,
-                ..Default::default()
-            })
+        let objects = object_store.list(Some(&path));
+
+        let objects = objects
+            .map_ok(|f| S3ObjectMeta::from(f).into())
             .try_collect()
             .await
             .unwrap();

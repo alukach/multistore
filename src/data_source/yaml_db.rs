@@ -46,16 +46,15 @@ impl InMemoryDataSourceRegistry {
 
 #[async_trait::async_trait]
 impl DataSourceRegistry for InMemoryDataSourceRegistry {
-    async fn list_buckets(&self, _access_key: Option<&String>) -> Vec<dto::Bucket> {
-        self.data_sources.iter().cloned().map(Into::into).collect()
+    async fn list_data_sources(&self, _access_key: Option<&String>) -> Vec<DataSource> {
+        self.data_sources.clone()
     }
 
     async fn get_object_store(&self, bucket_name: &str) -> Result<Arc<dyn ObjectStore>, Error> {
-        let bucket = self
-            .data_sources
-            .iter()
-            .find(|b| b.name == bucket_name)
-            .unwrap();
-        Ok(bucket.try_into()?)
+        let Some(datasource) = self.data_sources.iter().find(|b| b.name == bucket_name) else {
+            return Err(Error::from_string("Bucket not found"));
+        };
+
+        Ok(datasource.clone().try_into()?)
     }
 }

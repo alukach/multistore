@@ -1,4 +1,5 @@
 mod auth;
+mod conversion;
 mod data_source;
 mod error;
 mod s3;

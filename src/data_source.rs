@@ -21,25 +21,25 @@ impl DataSource {}
 /// various Object Storage backends).
 #[async_trait::async_trait]
 pub trait DataSourceRegistry {
-    async fn list_buckets(&self, access_key: Option<&String>) -> Vec<dto::Bucket>;
+    async fn list_data_sources(&self, access_key: Option<&String>) -> Vec<DataSource>;
 
     async fn get_object_store(&self, bucket_name: &str) -> Result<Arc<dyn ObjectStore>, Error>;
 }
 
-impl Into<dto::Bucket> for DataSource {
-    fn into(self) -> dto::Bucket {
-        dto::Bucket {
-            name: Some(self.name),
-            bucket_region: Some(self.region),
-            creation_date: self.creation_date,
+impl From<DataSource> for dto::Bucket {
+    fn from(source: DataSource) -> Self {
+        Self {
+            name: Some(source.name),
+            bucket_region: Some(source.region),
+            creation_date: source.creation_date,
         }
     }
 }
 
-impl TryFrom<&DataSource> for Arc<dyn ObjectStore> {
+impl TryFrom<DataSource> for Arc<dyn ObjectStore> {
     type Error = Error;
 
-    fn try_from(source: &DataSource) -> Result<Self, Self::Error> {
+    fn try_from(source: DataSource) -> Result<Self, Self::Error> {
         let url = Url::parse(&source.url).unwrap();
         let mut options = vec![("region", source.region.clone())];
 
@@ -50,7 +50,7 @@ impl TryFrom<&DataSource> for Arc<dyn ObjectStore> {
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.clone())),
         );
-        
+
         let (object_store, _path) = parse_url_opts(&url, options).unwrap();
         Ok(Arc::new(object_store))
     }

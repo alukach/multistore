@@ -44,8 +44,14 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         &self,
         req: S3Request<dto::ListObjectsV2Input>,
     ) -> S3Result<S3Response<dto::ListObjectsV2Output>> {
-        // TODO: Support pagination
         let bucket_name = req.input.bucket;
+        let max_keys = req.input.max_keys.unwrap_or(100) as usize;
+        let start_after = req
+            .input
+            .start_after
+            .map(|s| object_store::path::Path::from(s))
+            .unwrap_or(object_store::path::Path::from("/".to_string()));
+
         let (object_store, path) = match self.source.get_object_store(&bucket_name).await {
             Ok(object_store) => object_store,
             Err(e) => {
@@ -54,15 +60,34 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
             }
         };
 
-        let objects = object_store
-            .list(Some(&path))
-            .map_ok(|f| S3ObjectMeta::from(f).into())
-            .try_collect()
-            .await
-            .unwrap();
+        let mut objects = Vec::with_capacity(max_keys);
+        let mut is_truncated = false;
+
+        // List objects with pagination
+        let mut stream = object_store.list_with_offset(Some(&path), &start_after);
+        let mut count = 0;
+
+        while let Some(result) = stream.try_next().await.map_err(|e| {
+            println!("Error listing objects: {:?}", e);
+            S3Error::new(S3ErrorCode::InternalError)
+        })? {
+            let obj: dto::Object = S3ObjectMeta::from(result).into();
+
+            // Add the object to our results
+            objects.push(obj);
+            count += 1;
+
+            // Check if we've reached max_keys
+            if count >= max_keys {
+                is_truncated = true;
+                break;
+            }
+        }
 
         Ok(S3Response::new(dto::ListObjectsV2Output {
             contents: Some(objects),
+            is_truncated: Some(is_truncated),
+            max_keys: Some(max_keys as i32),
             ..Default::default()
         }))
     }

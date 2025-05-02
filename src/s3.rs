@@ -4,22 +4,21 @@ use futures_util::TryStreamExt;
 use s3s::dto;
 use s3s::{S3, S3Request, S3Response, S3Result};
 use s3s::{S3Error, S3ErrorCode};
-use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct S3Interface {
-    source: Arc<dyn DataSourceRegistry + Send + Sync>,
+pub struct S3Interface<T: DataSourceRegistry + Send + Sync + 'static> {
+    source: T,
 }
 
-impl S3Interface {
-    pub fn new(source: Arc<dyn DataSourceRegistry + Send + Sync>) -> Self {
+impl<T: DataSourceRegistry + Send + Sync> S3Interface<T> {
+    pub fn new(source: T) -> Self {
         Self { source }
     }
 }
 
 // TODO: When an object is read, we should emit metrics
 #[async_trait::async_trait]
-impl S3 for S3Interface {
+impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T> {
     async fn list_buckets(
         &self,
         req: S3Request<dto::ListBucketsInput>,

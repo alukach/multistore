@@ -3,6 +3,7 @@ use crate::error::Error;
 use object_store::{ObjectStore, path::Path};
 use s3s::dto;
 
+#[derive(Clone)]
 pub struct InMemoryDataSourceRegistry {
     data_sources: Vec<DataSource>,
 }

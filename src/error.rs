@@ -60,15 +60,3 @@ pub(crate) fn log(source: &dyn std::error::Error) {
         );
     }
 }
-
-macro_rules! try_ {
-    ($result:expr) => {
-        match $result {
-            Ok(val) => val,
-            Err(err) => {
-                $crate::error::log(&err);
-                return Err(::s3s::S3Error::internal_error(err));
-            }
-        }
-    };
-}

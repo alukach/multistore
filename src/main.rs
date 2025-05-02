@@ -26,5 +26,5 @@ fn main() -> Result {
         builder.set_auth(creds_registry);
         builder.build()
     };
-    serve(service, "127.0.0.1:8080".parse().unwrap())
+    serve(service, "0.0.0.0:8080".parse().unwrap())
 }

@@ -1,2 +1,2 @@
 [workspace]
-members = ["axum-api", "lib"]
+members = ["axum-api", "lambda-api", "lib"]

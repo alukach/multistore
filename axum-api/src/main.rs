@@ -1,15 +1,10 @@
-mod conversion;
-mod credentials;
-mod data_source;
-mod error;
-mod s3;
 mod server;
 mod utils;
 
-use credentials::yaml_auth::YAMLCredentialsRegistry;
-use data_source::yaml_db::InMemoryDataSourceRegistry;
-use error::Result;
-use s3::S3Interface;
+use lib::credentials::yaml_auth::YAMLCredentialsRegistry;
+use lib::data_source::yaml_db::InMemoryDataSourceRegistry;
+use lib::error::Result;
+use lib::s3::S3Interface;
 use s3s::service::S3ServiceBuilder;
 use server::serve;
 use utils::setup_tracing;

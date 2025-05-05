@@ -1,0 +1,13 @@
+[package]
+edition = "2024"
+name = "axum-api"
+version = "0.1.0"
+
+[dependencies]
+hyper-util = {version = "0.1.11", features = ["server-auto", "server-graceful", "http1", "http2", "tokio"]}
+lib = {path = "../lib"}
+log = "0.4.27"
+s3s = "0.11.0"
+tokio = {version = "1.44.2", features = ["rt-multi-thread", "fs", "io-util", "signal"]}
+tracing = "0.1.41"
+tracing-subscriber = {version = "0.3.19", features = ["env-filter"]}

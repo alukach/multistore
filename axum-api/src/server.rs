@@ -11,8 +11,8 @@ use crate::Result;
 #[tokio::main]
 pub async fn serve(service: S3Service, address: SocketAddr) -> Result {
     // Run server
-    let listener = TcpListener::bind(address).await?;
-    let local_addr = listener.local_addr()?;
+    let listener = TcpListener::bind(address).await.unwrap();
+    let local_addr = listener.local_addr().unwrap();
 
     let hyper_service = service.into_shared();
 

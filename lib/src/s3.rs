@@ -1,18 +1,22 @@
 use crate::conversion::S3ObjectMeta;
 use crate::data_source::DataSourceRegistry;
+use crate::error::Error;
 use futures_util::TryStreamExt;
+// use hyper::body::Bytes;
+use object_store::path::Path;
 use s3s::dto;
+use s3s::dto::StreamingBlob;
 use s3s::{S3, S3Request, S3Response, S3Result};
-use s3s::{S3Error, S3ErrorCode};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct S3Interface<T: DataSourceRegistry + Send + Sync + 'static> {
-    source: T,
+    registry: T,
 }
 
 impl<T: DataSourceRegistry + Send + Sync> S3Interface<T> {
-    pub fn new(source: T) -> Self {
-        Self { source }
+    pub fn new(registry: T) -> Self {
+        Self { registry }
     }
 }
 
@@ -24,10 +28,10 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         req: S3Request<dto::ListBucketsInput>,
     ) -> S3Result<S3Response<dto::ListBucketsOutput>> {
         let access_key = req.credentials.map(|c| c.access_key.clone());
-
+        // TODO: Support req.input.continuation_token,
         let buckets = self
-            .source
-            .list_data_sources(access_key.as_ref())
+            .registry
+            .list_data_sources(access_key.as_ref(), req.input)
             .await
             .into_iter()
             .map(Into::into)
@@ -45,31 +49,25 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         req: S3Request<dto::ListObjectsV2Input>,
     ) -> S3Result<S3Response<dto::ListObjectsV2Output>> {
         let bucket_name = req.input.bucket;
+        let source = self.registry.get_data_source(&bucket_name).await?;
+        let (object_store, source_prefix) = source.as_object_store(req.input.prefix)?;
+
         let max_keys = req.input.max_keys.unwrap_or(100) as usize;
         let start_after = req
             .input
             .start_after
-            .map(|s| object_store::path::Path::from(s))
-            .unwrap_or(object_store::path::Path::from("/".to_string()));
-
-        let (object_store, path) = match self.source.get_object_store(&bucket_name).await {
-            Ok(object_store) => object_store,
-            Err(e) => {
-                println!("Failed to get object store: {:?}", e);
-                return Err(S3Error::new(S3ErrorCode::InternalError));
-            }
-        };
-
-        let mut objects = Vec::with_capacity(max_keys);
-        let mut is_truncated = false;
+            .map(Path::from)
+            .unwrap_or(Path::from("/"));
 
         // List objects with pagination
-        let mut stream = object_store.list_with_offset(Some(&path), &start_after);
+        let mut objects = Vec::with_capacity(max_keys);
+        let mut stream = object_store.list_with_offset(Some(&source_prefix), &start_after);
         let mut count = 0;
+        let mut is_truncated = false;
 
         while let Some(result) = stream.try_next().await.map_err(|e| {
-            println!("Error listing objects: {:?}", e);
-            S3Error::new(S3ErrorCode::InternalError)
+            // TODO: Why do we need to explicitely call Error::from?
+            Error::from(e)
         })? {
             let obj: dto::Object = S3ObjectMeta::from(result).into();
 
@@ -88,6 +86,54 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
             contents: Some(objects),
             is_truncated: Some(is_truncated),
             max_keys: Some(max_keys as i32),
+            ..Default::default()
+        }))
+    }
+
+    async fn head_object(
+        &self,
+        req: S3Request<dto::HeadObjectInput>,
+    ) -> S3Result<S3Response<dto::HeadObjectOutput>> {
+        let bucket_name = req.input.bucket;
+        let source = self.registry.get_data_source(&bucket_name).await?;
+        let (object_store, source_prefix) = source.as_object_store(Some(req.input.key))?;
+        let object = object_store
+            .head(&source_prefix)
+            .await
+            .map_err(Error::from)?;
+        Ok(S3Response::new(dto::HeadObjectOutput {
+            metadata: Some(HashMap::from([
+                ("e_tag".to_string(), object.e_tag.unwrap_or_default()),
+                (
+                    "last_modified".to_string(),
+                    object.last_modified.to_string(),
+                ),
+                ("location".to_string(), object.location.to_string()),
+                ("version_id".to_string(), object.version.unwrap_or_default()),
+                ("size".to_string(), object.size.to_string()),
+            ])),
+            ..Default::default()
+        }))
+    }
+
+    async fn get_object(
+        &self,
+        req: S3Request<dto::GetObjectInput>,
+    ) -> S3Result<S3Response<dto::GetObjectOutput>> {
+        let bucket_name = req.input.bucket;
+        // req.input.range.map(|r| {
+        //     println!("range: {:?}", r);
+        // });
+        let source = self.registry.get_data_source(&bucket_name).await?;
+        let (object_store, source_prefix) = source.as_object_store(Some(req.input.key))?;
+        let object = object_store
+            .get(&source_prefix)
+            .await
+            .map_err(Error::from)?;
+        // let stream = object.into_stream();
+
+        Ok(S3Response::new(dto::GetObjectOutput {
+            body: Some(StreamingBlob::wrap(object.into_stream())),
             ..Default::default()
         }))
     }

@@ -1,13 +1,16 @@
 use crate::conversion::S3ObjectMeta;
 use crate::data_source::DataSourceRegistry;
 use crate::error::Error;
+use crate::stream::SyncStream;
+use bytes::Bytes;
+use futures_util::Stream;
 use futures_util::TryStreamExt;
-// use hyper::body::Bytes;
 use object_store::path::Path;
 use s3s::dto;
 use s3s::dto::StreamingBlob;
 use s3s::{S3, S3Request, S3Response, S3Result};
 use std::collections::HashMap;
+use std::pin::Pin;
 
 #[derive(Clone)]
 pub struct S3Interface<T: DataSourceRegistry + Send + Sync + 'static> {
@@ -121,19 +124,16 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         req: S3Request<dto::GetObjectInput>,
     ) -> S3Result<S3Response<dto::GetObjectOutput>> {
         let bucket_name = req.input.bucket;
-        // req.input.range.map(|r| {
-        //     println!("range: {:?}", r);
-        // });
         let source = self.registry.get_data_source(&bucket_name).await?;
         let (object_store, source_prefix) = source.as_object_store(Some(req.input.key))?;
-        let object = object_store
-            .get(&source_prefix)
-            .await
-            .map_err(Error::from)?;
-        // let stream = object.into_stream();
+        let object = object_store.get(&source_prefix).await.unwrap();
+
+        let raw_stream = object.into_stream().map_err(Error::from);
+        let stream: Pin<Box<dyn Stream<Item = Result<Bytes, Error>> + Send + Sync>> =
+            Box::pin(SyncStream(raw_stream));
 
         Ok(S3Response::new(dto::GetObjectOutput {
-            body: Some(StreamingBlob::wrap(object.into_stream())),
+            body: Some(StreamingBlob::wrap(stream)),
             ..Default::default()
         }))
     }

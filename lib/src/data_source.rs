@@ -3,6 +3,7 @@ use object_store::path::Path;
 use object_store::{ObjectStore, parse_url_opts};
 use s3s::dto;
 use std::collections::HashMap;
+use std::sync::Arc;
 use url::Url;
 pub mod yaml_db;
 
@@ -16,7 +17,7 @@ pub struct DataSource {
 }
 
 impl DataSource {
-    pub fn as_object_store(self, prefix: Option<String>) -> Result<(Box<dyn ObjectStore>, Path)> {
+    pub fn as_object_store(self, prefix: Option<String>) -> Result<(Arc<dyn ObjectStore>, Path)> {
         let (object_store, root_prefix) = self.try_into()?;
         let mut full_path = format!("{}/{}", root_prefix.to_string(), prefix.unwrap_or_default());
         if full_path.ends_with("/") {
@@ -49,7 +50,7 @@ impl From<DataSource> for dto::Bucket {
     }
 }
 
-impl TryFrom<DataSource> for (Box<dyn ObjectStore>, Path) {
+impl TryFrom<DataSource> for (Arc<dyn ObjectStore>, Path) {
     type Error = Error;
 
     fn try_from(source: DataSource) -> Result<Self, Self::Error> {
@@ -65,7 +66,7 @@ impl TryFrom<DataSource> for (Box<dyn ObjectStore>, Path) {
         );
 
         let (object_store, path) = parse_url_opts(&url, options).unwrap();
-        Ok((object_store, path))
+        Ok((Arc::new(object_store), path))
     }
 }
 

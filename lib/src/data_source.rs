@@ -19,7 +19,7 @@ pub struct DataSource {
 impl DataSource {
     pub fn as_object_store(self, prefix: Option<String>) -> Result<(Arc<dyn ObjectStore>, Path)> {
         let (object_store, root_prefix) = self.try_into()?;
-        let mut full_path = format!("{}/{}", root_prefix.to_string(), prefix.unwrap_or_default());
+        let mut full_path = format!("{}/{}", root_prefix, prefix.unwrap_or_default());
         if full_path.ends_with("/") {
             full_path = full_path.strip_suffix("/").unwrap().to_string();
         }

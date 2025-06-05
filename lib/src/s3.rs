@@ -64,7 +64,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
             ..Default::default()
         };
 
-        if let Some(_) = req.input.delimiter {
+        if req.input.delimiter.is_some() {
             let list_result = object_store
                 .list_with_delimiter(Some(&prefix))
                 .await

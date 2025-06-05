@@ -1,6 +1,5 @@
 use crate::data_source::{DataSource, DataSourceRegistry};
 use crate::error::{Error, Result};
-use object_store::{ObjectStore, path::Path};
 use s3s::dto;
 
 #[derive(Clone)]
@@ -19,7 +18,7 @@ impl InMemoryDataSourceRegistry {
             .iter()
             .map(|v| {
                 let name = v["name"].as_str().unwrap().to_string();
-                let url = v["url"].as_str().or(Some(&name)).unwrap().to_string();
+                let url = v["url"].as_str().unwrap_or(&name).to_string();
                 let region = v["region"].as_str().unwrap().to_string();
                 let credentials = v["credentials"]
                     .as_mapping()

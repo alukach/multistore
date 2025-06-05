@@ -65,10 +65,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         let mut count = 0;
         let mut is_truncated = false;
 
-        while let Some(result) = stream.try_next().await.map_err(|e| {
-            // TODO: Why do we need to explicitely call Error::from?
-            Error::from(e)
-        })? {
+        while let Some(result) = stream.try_next().await.map_err(Error::from)? {
             let obj: dto::Object = S3ObjectMeta::from(result).into();
 
             // Add the object to our results

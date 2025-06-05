@@ -16,6 +16,15 @@ Lambda execution makes use of the [aws-lambda-rust-runtime](https://github.com/a
 cargo lambda watch --bin lambda-api
 ```
 
+#### Deployment
+
+```sh
+cargo lambda deploy multistore --binary-name lambda-api --include database.yaml --enable-function-url
+```
+
+> [!NOTE]
+> Lambda Function URLs seem to strip out required authorization headers. Instead, you must manually place an API Gateway in front of the deployed Lambda.
+
 ### Accessing the API
 
 ```sh

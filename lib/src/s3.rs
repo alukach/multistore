@@ -102,16 +102,10 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
             .await
             .map_err(Error::from)?;
         Ok(S3Response::new(dto::HeadObjectOutput {
-            metadata: Some(HashMap::from([
-                ("e_tag".to_string(), object.e_tag.unwrap_or_default()),
-                (
-                    "last_modified".to_string(),
-                    object.last_modified.to_string(),
-                ),
-                ("location".to_string(), object.location.to_string()),
-                ("version_id".to_string(), object.version.unwrap_or_default()),
-                ("size".to_string(), object.size.to_string()),
-            ])),
+            content_length: Some(object.size as i64),
+            version_id: object.version,
+            e_tag: object.e_tag,
+            last_modified: Some(Timestamp::from(object.last_modified).into()),
             ..Default::default()
         }))
     }

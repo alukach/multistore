@@ -1,16 +1,13 @@
-use crate::conversion::S3ObjectMeta;
+use crate::conversion::{S3ObjectMeta, Timestamp};
 use crate::data_source::DataSourceRegistry;
 use crate::error::Error;
 use crate::stream::SyncStream;
-use bytes::Bytes;
-use futures_util::Stream;
 use futures_util::TryStreamExt;
 use object_store::path::Path;
 use s3s::dto;
 use s3s::dto::StreamingBlob;
 use s3s::{S3, S3Request, S3Response, S3Result};
 use std::collections::HashMap;
-use std::pin::Pin;
 
 #[derive(Clone)]
 pub struct S3Interface<T: DataSourceRegistry + Send + Sync + 'static> {
@@ -126,14 +123,20 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         let bucket_name = req.input.bucket;
         let source = self.registry.get_data_source(&bucket_name).await?;
         let (object_store, source_prefix) = source.as_object_store(Some(req.input.key))?;
-        let object = object_store.get(&source_prefix).await.unwrap();
+        let object = object_store
+            .get(&source_prefix)
+            .await
+            .map_err(Error::from)?;
 
+        let meta = object.meta.clone();
         let raw_stream = object.into_stream().map_err(Error::from);
-        let stream: Pin<Box<dyn Stream<Item = Result<Bytes, Error>> + Send + Sync>> =
-            Box::pin(SyncStream(raw_stream));
 
         Ok(S3Response::new(dto::GetObjectOutput {
-            body: Some(StreamingBlob::wrap(stream)),
+            body: Some(StreamingBlob::wrap(Box::pin(SyncStream(raw_stream)))),
+            content_length: Some(meta.size as i64),
+            version_id: meta.version,
+            e_tag: meta.e_tag,
+            last_modified: Some(Timestamp::from(meta.last_modified).into()),
             ..Default::default()
         }))
     }

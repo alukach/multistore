@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use object_store::ObjectMeta;
 use s3s::dto;
 use std::time::SystemTime;
@@ -35,13 +36,36 @@ impl From<S3ObjectMeta> for ObjectMeta {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Timestamp(SystemTime);
+
+impl From<dto::Timestamp> for Timestamp {
+    fn from(timestamp: dto::Timestamp) -> Self {
+        Self(std::time::SystemTime::from(time::OffsetDateTime::from(
+            timestamp,
+        )))
+    }
+}
+
+impl From<Timestamp> for dto::Timestamp {
+    fn from(timestamp: Timestamp) -> Self {
+        dto::Timestamp::from(timestamp.0)
+    }
+}
+
+impl From<DateTime<Utc>> for Timestamp {
+    fn from(timestamp: DateTime<Utc>) -> Self {
+        Self(std::time::SystemTime::from(timestamp))
+        // Some(dto::Timestamp::from(SystemTime::from(meta.0.last_modified)))
+    }
+}
+
 impl From<&dto::Object> for S3ObjectMeta {
     fn from(object: &dto::Object) -> Self {
         let last_modified = object
             .last_modified
-            .as_ref()
-            // TODO: There has to be a better way to do this conversion from s3s::dto::Timestamp to chrono::DateTime<Utc>
-            .map(|ts| std::time::SystemTime::from(time::OffsetDateTime::from(ts.clone())))
+            .clone()
+            .map(|ts| Timestamp::from(ts).0)
             .unwrap_or(std::time::SystemTime::now());
 
         Self(ObjectMeta {
@@ -59,7 +83,7 @@ impl From<S3ObjectMeta> for dto::Object {
         Self {
             key: Some(meta.0.location.to_string()),
             size: Some(meta.0.size as i64),
-            last_modified: Some(dto::Timestamp::from(SystemTime::from(meta.0.last_modified))),
+            last_modified: Some(Timestamp::from(meta.0.last_modified).into()),
             e_tag: meta.0.e_tag,
             ..Default::default()
         }
@@ -76,5 +100,18 @@ impl AsRef<ObjectMeta> for S3ObjectMeta {
 impl AsMut<ObjectMeta> for S3ObjectMeta {
     fn as_mut(&mut self) -> &mut ObjectMeta {
         &mut self.0
+    }
+}
+
+pub trait Convert<T> {
+    fn convert(self) -> T;
+}
+
+impl<T, U> Convert<U> for T
+where
+    T: Into<U>,
+{
+    fn convert(self) -> U {
+        self.into()
     }
 }

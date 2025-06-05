@@ -3,3 +3,4 @@ pub mod credentials;
 pub mod data_source;
 pub mod error;
 pub mod s3;
+mod stream;

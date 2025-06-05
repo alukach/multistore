@@ -3,11 +3,11 @@ use crate::data_source::DataSourceRegistry;
 use crate::error::Error;
 use crate::stream::SyncStream;
 use futures_util::TryStreamExt;
+use object_store::ObjectStore;
 use object_store::path::Path;
 use s3s::dto;
 use s3s::dto::StreamingBlob;
 use s3s::{S3, S3Request, S3Response, S3Result};
-use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct S3Interface<T: DataSourceRegistry + Send + Sync + 'static> {
@@ -50,7 +50,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
     ) -> S3Result<S3Response<dto::ListObjectsV2Output>> {
         let bucket_name = req.input.bucket;
         let source = self.registry.get_data_source(&bucket_name).await?;
-        let (object_store, source_prefix) = source.as_object_store(req.input.prefix)?;
+        let (object_store, prefix) = source.as_object_store(req.input.prefix.clone())?;
 
         let max_keys = req.input.max_keys.unwrap_or(100) as usize;
         let start_after = req
@@ -59,32 +59,52 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
             .map(Path::from)
             .unwrap_or(Path::from("/"));
 
-        // List objects with pagination
-        let mut objects = Vec::with_capacity(max_keys);
-        let mut stream = object_store.list_with_offset(Some(&source_prefix), &start_after);
-        let mut count = 0;
-        let mut is_truncated = false;
+        let mut response = dto::ListObjectsV2Output {
+            max_keys: Some(max_keys.try_into().unwrap_or(i32::MAX)),
+            ..Default::default()
+        };
 
-        while let Some(result) = stream.try_next().await.map_err(Error::from)? {
-            let obj: dto::Object = S3ObjectMeta::from(result).into();
+        if let Some(_) = req.input.delimiter {
+            let list_result = object_store
+                .list_with_delimiter(Some(&prefix))
+                .await
+                .map_err(Error::from)?;
 
-            // Add the object to our results
-            objects.push(obj);
-            count += 1;
+            let objects: Vec<_> = list_result
+                .objects
+                .into_iter()
+                .map(|obj| S3ObjectMeta::from(obj).into())
+                .collect();
 
-            // Check if we've reached max_keys
-            if count >= max_keys {
-                is_truncated = true;
-                break;
+            let common_prefixes: Vec<_> = list_result
+                .common_prefixes
+                .into_iter()
+                .map(|prefix| dto::CommonPrefix {
+                    prefix: Some(format!("{}/", prefix)),
+                })
+                .collect();
+
+            let total_items = objects.len() + common_prefixes.len();
+            response.contents = Some(objects);
+            response.common_prefixes = Some(common_prefixes);
+            response.is_truncated = Some(total_items > max_keys);
+        } else {
+            let mut objects = Vec::with_capacity(max_keys);
+            let mut stream = object_store.list_with_offset(Some(&prefix), &start_after);
+
+            while let Some(result) = stream.try_next().await.map_err(Error::from)? {
+                objects.push(S3ObjectMeta::from(result).into());
+                if objects.len() >= max_keys {
+                    response.contents = Some(objects);
+                    response.is_truncated = Some(true);
+                    return Ok(S3Response::new(response));
+                }
             }
+            response.contents = Some(objects);
+            response.is_truncated = Some(false);
         }
 
-        Ok(S3Response::new(dto::ListObjectsV2Output {
-            contents: Some(objects),
-            is_truncated: Some(is_truncated),
-            max_keys: Some(max_keys as i32),
-            ..Default::default()
-        }))
+        Ok(S3Response::new(response))
     }
 
     async fn head_object(
@@ -93,11 +113,8 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
     ) -> S3Result<S3Response<dto::HeadObjectOutput>> {
         let bucket_name = req.input.bucket;
         let source = self.registry.get_data_source(&bucket_name).await?;
-        let (object_store, source_prefix) = source.as_object_store(Some(req.input.key))?;
-        let object = object_store
-            .head(&source_prefix)
-            .await
-            .map_err(Error::from)?;
+        let (object_store, key) = source.as_object_store(Some(req.input.key))?;
+        let object = object_store.head(&key).await.map_err(Error::from)?;
         Ok(S3Response::new(dto::HeadObjectOutput {
             content_length: Some(object.size as i64),
             version_id: object.version,
@@ -113,11 +130,8 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
     ) -> S3Result<S3Response<dto::GetObjectOutput>> {
         let bucket_name = req.input.bucket;
         let source = self.registry.get_data_source(&bucket_name).await?;
-        let (object_store, source_prefix) = source.as_object_store(Some(req.input.key))?;
-        let object = object_store
-            .get(&source_prefix)
-            .await
-            .map_err(Error::from)?;
+        let (object_store, key) = source.as_object_store(Some(req.input.key))?;
+        let object = object_store.get(&key).await.map_err(Error::from)?;
 
         let meta = object.meta.clone();
         let raw_stream = object.into_stream().map_err(Error::from);

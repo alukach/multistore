@@ -48,11 +48,10 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         &self,
         req: S3Request<dto::ListObjectsV2Input>,
     ) -> S3Result<S3Response<dto::ListObjectsV2Output>> {
-        let bucket_name = req.input.bucket;
-        let source = self.registry.get_data_source(&bucket_name).await?;
+        let source = self.registry.get_data_source(&req.input.bucket).await?;
         let (object_store, prefix) = source.as_object_store(req.input.prefix.clone())?;
 
-        let max_keys = req.input.max_keys.unwrap_or(100) as usize;
+        let max_keys = req.input.max_keys.unwrap_or(1000) as usize;
         let start_after = req
             .input
             .start_after
@@ -111,8 +110,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         &self,
         req: S3Request<dto::HeadObjectInput>,
     ) -> S3Result<S3Response<dto::HeadObjectOutput>> {
-        let bucket_name = req.input.bucket;
-        let source = self.registry.get_data_source(&bucket_name).await?;
+        let source = self.registry.get_data_source(&req.input.bucket).await?;
         let (object_store, key) = source.as_object_store(Some(req.input.key))?;
         let object = object_store.head(&key).await.map_err(Error::from)?;
         Ok(S3Response::new(dto::HeadObjectOutput {
@@ -128,8 +126,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         &self,
         req: S3Request<dto::GetObjectInput>,
     ) -> S3Result<S3Response<dto::GetObjectOutput>> {
-        let bucket_name = req.input.bucket;
-        let source = self.registry.get_data_source(&bucket_name).await?;
+        let source = self.registry.get_data_source(&req.input.bucket).await?;
         let (object_store, key) = source.as_object_store(Some(req.input.key))?;
         let object = object_store.get(&key).await.map_err(Error::from)?;
 

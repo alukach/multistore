@@ -8,6 +8,12 @@
 cargo run --bin hyper-api
 ```
 
+### Running Workers API
+
+```sh
+npx wrangler dev --cwd cf-workers-api
+```
+
 ### Running Lambda
 
 Lambda execution makes use of the [aws-lambda-rust-runtime](https://github.com/awslabs/aws-lambda-rust-runtime).

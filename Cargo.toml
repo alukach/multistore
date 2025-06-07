@@ -1,6 +1,7 @@
 [workspace]
 members = [
-  "hyper-api",
-  "lambda-api",
-  "lib",
+    "cf-workers-api",
+    "hyper-api",
+    "lambda-api",
+    "lib",
 ]

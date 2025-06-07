@@ -118,19 +118,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum-api"
-version = "0.1.0"
-dependencies = [
- "hyper-util",
- "lib",
- "log",
- "s3s",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "backtrace"
 version = "0.3.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -643,6 +630,19 @@ dependencies = [
  "smallvec",
  "tokio",
  "want",
+]
+
+[[package]]
+name = "hyper-api"
+version = "0.1.0"
+dependencies = [
+ "hyper-util",
+ "lib",
+ "log",
+ "s3s",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

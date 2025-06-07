@@ -2,10 +2,10 @@
 
 ## Development
 
-### Running Axum
+### Running Hyper API
 
 ```sh
-cargo run --bin axum-api
+cargo run --bin hyper-api
 ```
 
 ### Running Lambda

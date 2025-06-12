@@ -1,8 +1,8 @@
 [package]
+authors = ["Anthony Lukach <anthonylukach@gmail.com>"]
+edition = "2021"
 name = "cf-workers-api"
 version = "0.1.0"
-edition = "2021"
-authors = [ "Anthony Lukach <anthonylukach@gmail.com>" ]
 
 [package.metadata.release]
 release = false
@@ -15,10 +15,24 @@ wasm-opt = false
 crate-type = ["cdylib"]
 
 [dependencies]
-worker = { version="0.5.0", features=['http'] }
-worker-macros = { version="0.5.0", features=['http'] }
-console_error_panic_hook = { version = "0.1.1" }
+console_error_panic_hook = {version = "0.1.7"}
 http = "1.1"
-lib = { version = "0.1.0", path = "../lib" }
-s3s = { version = "0.11.0" }
-getrandom = { version = "0.2", features = ["js"] }  # NOTE: Need js feature to not fail build
+lib = {version = "0.1.0", path = "../lib"}
+s3s = {version = "0.11.0"}
+worker = {version = "0.5.0", features = ['http']}
+worker-macros = {version = "0.5.0", features = ['http']}
+
+object_store = "0.12.2"
+ring = {version = "*", optional = true, features = [
+  "wasm32_unknown_unknown_js",
+]}
+
+[dependencies.getrandom_v03]
+features = ["wasm_js"]
+package = "getrandom"
+version = "0.3"
+
+[dependencies.getrandom_v02]
+features = ["js"]
+package = "getrandom"
+version = "0.2"

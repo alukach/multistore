@@ -1,7 +1,8 @@
 [workspace]
 members = [
-    "cf-workers-api",
-    "hyper-api",
-    "lambda-api",
-    "lib",
+  "cf-workers-api",
+  "hyper-api",
+  "lambda-api",
+  "lib",
 ]
+resolver = "3"

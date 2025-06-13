@@ -1,17 +1,28 @@
 use crate::data_source::{DataSource, DataSourceRegistry};
 use crate::error::{Error, Result};
+use chrono::Utc;
 use s3s::dto;
 
 #[derive(Clone)]
-pub struct InMemoryDataSourceRegistry {
+pub struct StaticDataSourceRegistry {
     data_sources: Vec<DataSource>,
 }
 
-impl InMemoryDataSourceRegistry {
+impl StaticDataSourceRegistry {
+    /// Create with inputted data sources
+    pub fn from_data_sources(data_sources: Vec<DataSource>) -> Self {
+        Self { data_sources }
+    }
+
+    /// Create with yaml file
     pub fn from_yaml(path: &str) -> Self {
         let file = std::fs::File::open(path).unwrap();
         let reader = std::io::BufReader::new(file);
         let config: serde_yaml::Value = serde_yaml::from_reader(reader).unwrap();
+        Self::from_serde(config)
+    }
+
+    pub fn from_serde(config: serde_yaml::Value) -> Self {
         let data_sources = config["data-sources"]
             .as_sequence()
             .unwrap()
@@ -47,7 +58,7 @@ impl InMemoryDataSourceRegistry {
 }
 
 #[async_trait::async_trait]
-impl DataSourceRegistry for InMemoryDataSourceRegistry {
+impl DataSourceRegistry for StaticDataSourceRegistry {
     async fn list_data_sources(
         &self,
         _access_key: Option<&String>,

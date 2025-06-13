@@ -15,17 +15,18 @@ wasm-opt = false
 crate-type = ["cdylib"]
 
 [dependencies]
+lib = {version = "0.1.0", path = "../lib"}
+
 console_error_panic_hook = {version = "0.1.7"}
 http = "1.1"
-lib = {version = "0.1.0", path = "../lib"}
-s3s = {version = "0.11.0"}
-worker = {version = "0.5.0", features = ['http']}
-worker-macros = {version = "0.5.0", features = ['http']}
-
 object_store = "0.12.2"
 ring = {version = "*", optional = true, features = [
   "wasm32_unknown_unknown_js",
 ]}
+s3s = {version = "0.11.0"}
+serde_yaml = "0.9.34"
+worker = {version = "0.5.0", features = ['http']}
+worker-macros = {version = "0.5.0", features = ['http']}
 
 [dependencies.getrandom_v03]
 features = ["wasm_js"]

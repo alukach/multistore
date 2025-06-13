@@ -1,5 +1,6 @@
-use lib::credentials::yaml_auth::YAMLCredentialsRegistry;
-use lib::data_source::yaml_db::InMemoryDataSourceRegistry;
+use console_error_panic_hook;
+use lib::credentials::static_auth::StaticCredentialsRegistry;
+use lib::data_source::static_db::StaticDataSourceRegistry;
 use lib::s3::S3Interface;
 use s3s::{service::S3ServiceBuilder, S3Error};
 use worker::{event, Context, Env, HttpRequest};
@@ -10,8 +11,14 @@ async fn fetch(
     _env: Env,
     _ctx: Context,
 ) -> s3s::S3Result<http::Response<s3s::Body>> {
-    let creds_registry = YAMLCredentialsRegistry::from_yaml("database.yaml");
-    let data_source_registry = InMemoryDataSourceRegistry::from_yaml("database.yaml");
+    // Initialize panic hook for better error messages
+    console_error_panic_hook::set_once();
+
+    let config: serde_yaml::Value =
+        serde_yaml::from_str(include_str!("../../database.yaml")).unwrap();
+
+    let creds_registry = StaticCredentialsRegistry::from_serde(config.clone());
+    let data_source_registry = StaticDataSourceRegistry::from_serde(config.clone());
     let s3_backend = S3Interface::new(data_source_registry);
 
     let service = {
@@ -20,9 +27,9 @@ async fn fetch(
         builder.build()
     };
 
-    service
-        .call(req.map(|body| s3s::Body::http_body(body)))
-        .await
+    // Convert the request and handle it
+    let req = req.map(|body| s3s::Body::http_body(body));
+    service.call(req).await
 }
 
 struct ApiError(S3Error);

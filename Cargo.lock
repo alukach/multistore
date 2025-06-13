@@ -208,6 +208,7 @@ dependencies = [
  "object_store",
  "ring",
  "s3s",
+ "serde_yaml",
  "worker",
  "worker-macros",
 ]

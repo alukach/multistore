@@ -5,7 +5,7 @@ use s3s::dto;
 use std::collections::HashMap;
 use std::sync::Arc;
 use url::Url;
-pub mod yaml_db;
+pub mod static_db;
 
 #[derive(Debug, Clone)]
 pub struct DataSource {

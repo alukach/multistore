@@ -206,7 +206,6 @@ dependencies = [
  "http",
  "lib",
  "object_store",
- "ring",
  "s3s",
  "serde_yaml",
  "worker",

@@ -12,7 +12,7 @@ chrono = "0.4.41"
 futures-util = "0.3.31"
 js-sys = {version = "0.3.69", optional = true}
 object_store = {version = "0.12.2", features = ["aws"], default-features = false}
-s3s = "0.11.0"
+s3s = { git = "https://github.com/alukach/s3s-wasm.git", branch = "main", package = "s3s" }
 serde_json = "1.0.140"
 serde_yaml = "0.9.34"
 thiserror = "2.0.12"

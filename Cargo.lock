@@ -1021,6 +1021,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures-util",
+ "js-sys",
  "object_store",
  "s3s",
  "serde_json",

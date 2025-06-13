@@ -1,7 +1,7 @@
 use crate::data_source::{DataSource, DataSourceRegistry};
 use crate::error::{Error, Result};
-use chrono::Utc;
 use s3s::dto;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone)]
 pub struct StaticDataSourceRegistry {
@@ -42,7 +42,7 @@ impl StaticDataSourceRegistry {
                         )
                     })
                     .collect();
-                let creation_date = Some(dto::Timestamp::from(std::time::SystemTime::now()));
+                let creation_date = Some(dto::Timestamp::from(SystemTime::from(UNIX_EPOCH)));
 
                 DataSource {
                     name,

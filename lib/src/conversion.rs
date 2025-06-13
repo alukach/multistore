@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use object_store::ObjectMeta;
 use s3s::dto;
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// A wrapper around ObjectMeta that provides conversion to/from dto::Object
 #[derive(Debug, Clone)]
@@ -56,7 +56,6 @@ impl From<Timestamp> for dto::Timestamp {
 impl From<DateTime<Utc>> for Timestamp {
     fn from(timestamp: DateTime<Utc>) -> Self {
         Self(std::time::SystemTime::from(timestamp))
-        // Some(dto::Timestamp::from(SystemTime::from(meta.0.last_modified)))
     }
 }
 
@@ -66,7 +65,7 @@ impl From<&dto::Object> for S3ObjectMeta {
             .last_modified
             .clone()
             .map(|ts| Timestamp::from(ts).0)
-            .unwrap_or(std::time::SystemTime::now());
+            .unwrap_or(SystemTime::from(UNIX_EPOCH));
 
         Self(ObjectMeta {
             location: object_store::path::Path::from(object.key.as_deref().unwrap_or("")),

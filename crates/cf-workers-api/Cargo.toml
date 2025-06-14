@@ -19,7 +19,6 @@ multistore = {path = "../multistore", features = ["wasm"]}
 
 console_error_panic_hook = {version = "0.1.7"}
 http = "1.1"
-object_store = "0.12.2"
 s3s = {version = "*", git = "https://github.com/alukach/s3s-wasm.git", branch = "main", package = "s3s"}
 serde_yaml = "0.9.34"
 worker = {version = "0.5.0", features = ["http"]}

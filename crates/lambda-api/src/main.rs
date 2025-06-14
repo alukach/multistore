@@ -5,10 +5,10 @@ use s3s::service::{S3Service, S3ServiceBuilder};
 use std::env;
 use std::sync::Arc;
 
-use lib::credentials::static_auth::StaticCredentialsRegistry;
-use lib::data_source::static_db::StaticDataSourceRegistry;
-use lib::error::Result;
-use lib::s3::S3Interface;
+use multistore::credentials::static_auth::StaticCredentialsRegistry;
+use multistore::data_source::static_db::StaticDataSourceRegistry;
+use multistore::error::Result;
+use multistore::s3::S3Interface;
 use utils::{convert_request, convert_response};
 
 pub static S3_SERVICE: std::sync::OnceLock<Arc<S3Service>> = std::sync::OnceLock::new();

@@ -1,8 +1,3 @@
 [workspace]
-members = [
-  "cf-workers-api",
-  "hyper-api",
-  "lambda-api",
-  "lib",
-]
+members = ["crates/*"]
 resolver = "3"

@@ -1,7 +1,7 @@
 use console_error_panic_hook;
-use lib::credentials::static_auth::StaticCredentialsRegistry;
-use lib::data_source::static_db::StaticDataSourceRegistry;
-use lib::s3::S3Interface;
+use multistore::credentials::static_auth::StaticCredentialsRegistry;
+use multistore::data_source::static_db::StaticDataSourceRegistry;
+use multistore::s3::S3Interface;
 use s3s::{service::S3ServiceBuilder, S3Error};
 use worker::{event, Context, Env, HttpRequest};
 
@@ -15,7 +15,7 @@ async fn fetch(
     console_error_panic_hook::set_once();
 
     let config: serde_yaml::Value =
-        serde_yaml::from_str(include_str!("../../database.yaml")).unwrap();
+        serde_yaml::from_str(include_str!("../../../database.yaml")).unwrap();
 
     let creds_registry = StaticCredentialsRegistry::from_serde(config.clone());
     let data_source_registry = StaticDataSourceRegistry::from_serde(config.clone());

@@ -1,10 +1,10 @@
 mod server;
 mod utils;
 
-use lib::credentials::static_auth::StaticCredentialsRegistry;
-use lib::data_source::static_db::StaticDataSourceRegistry;
-use lib::error::Result;
-use lib::s3::S3Interface;
+use multistore::credentials::static_auth::StaticCredentialsRegistry;
+use multistore::data_source::static_db::StaticDataSourceRegistry;
+use multistore::error::Result;
+use multistore::s3::S3Interface;
 use s3s::service::S3ServiceBuilder;
 use server::serve;
 use utils::setup_tracing;

@@ -6,7 +6,7 @@ version = "0.1.0"
 [dependencies]
 hyper-util = {version = "0.1.11", features = ["server-auto", "server-graceful", "http1", "http2", "tokio"]}
 log = "0.4.27"
-multistore = {path = "../multistore", default-features = false}
+multistore = {path = "../../multistore", default-features = false}
 s3s = {git = "https://github.com/alukach/s3s-wasm.git", branch = "main", package = "s3s"}
 tokio = {version = "1.45.1", features = ["rt-multi-thread", "fs", "io-util", "signal"]}
 tracing = "0.1.41"

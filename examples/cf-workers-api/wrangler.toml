@@ -6,3 +6,6 @@ name = "cf-workers-api"
 command = """
   cargo install -q worker-build && worker-build --release --package cf-workers-api
   """
+
+[observability.logs]
+enabled = true

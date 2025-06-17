@@ -11,7 +11,7 @@ cargo run --bin hyper-api
 ### Running Workers API
 
 ```sh
-npx wrangler dev --cwd cf-workers-api
+npx wrangler dev --cwd examples/cf-workers-api
 ```
 
 ### Running Lambda

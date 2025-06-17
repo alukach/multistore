@@ -1,3 +1,4 @@
 /target
 database.yaml
 node_modules
+dist

@@ -205,6 +205,7 @@ dependencies = [
  "getrandom 0.3.3",
  "http",
  "multistore",
+ "object_store",
  "s3s",
  "serde_yaml",
  "worker",

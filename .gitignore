@@ -2,3 +2,4 @@
 database.yaml
 node_modules
 dist
+.dev.vars

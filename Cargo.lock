@@ -200,14 +200,20 @@ dependencies = [
 name = "cf-workers-api"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "console_error_panic_hook",
+ "futures",
+ "futures-util",
  "getrandom 0.2.16",
  "getrandom 0.3.3",
  "http",
+ "http-body-util",
  "multistore",
  "object_store",
+ "reqwest",
  "s3s",
  "serde_yaml",
+ "web-sys",
  "worker",
  "worker-macros",
 ]

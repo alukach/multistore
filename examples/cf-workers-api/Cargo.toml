@@ -17,11 +17,17 @@ crate-type = ["cdylib"]
 [dependencies]
 multistore = {path = "../../multistore", features = ["wasm"]}
 
+bytes = "1.10.1"
 console_error_panic_hook = {version = "0.1.7"}
+futures = "0.3.31"
+futures-util = "0.3"
 http = "1.1"
+http-body-util = "0.1.3"
 object_store = {version = "0.12.2", features = ["aws"], default-features = false}
+reqwest = {version = "0.12.20", default-features = false, features = ["stream"]}
 s3s = {version = "*", git = "https://github.com/alukach/s3s-wasm.git", branch = "main", package = "s3s"}
 serde_yaml = "0.9.34"
+web-sys = "0.3.77"
 worker = {version = "0.5.0", features = ["http"]}
 worker-macros = {version = "0.5.0", features = ["http"]}
 

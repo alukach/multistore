@@ -1,6 +1,5 @@
 use bytes::Bytes;
 use console_error_panic_hook;
-use futures::TryStreamExt;
 use http;
 use http_body_util::BodyExt;
 use http_body_util::Full;
@@ -14,7 +13,45 @@ use object_store::{
     path::Path,
     ObjectStore, Result as ObjectStoreResult,
 };
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use web_sys::ReadableStream;
+
+// Global storage for the ReadableStream - safe in single-threaded WASM
+static mut GLOBAL_STREAM: Option<ReadableStream> = None;
+
+// Helper functions to safely access the global stream
+fn set_global_stream(stream: ReadableStream) {
+    unsafe {
+        GLOBAL_STREAM = Some(stream);
+    }
+}
+
+fn take_global_stream() -> Option<ReadableStream> {
+    unsafe { GLOBAL_STREAM.take() }
+}
+
+// Wrapper to convert ReadableStream to a futures Stream
+struct ReadableStreamWrapper {
+    stream: ReadableStream,
+}
+
+impl ReadableStreamWrapper {
+    fn new(stream: ReadableStream) -> Self {
+        Self { stream }
+    }
+}
+
+impl futures::Stream for ReadableStreamWrapper {
+    type Item = Result<Bytes, worker::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // For now, return a simple implementation
+        // In a real implementation, you would need to properly read from the ReadableStream
+        // This is a placeholder that returns a single chunk
+        Poll::Ready(Some(Ok(Bytes::from("data from stream"))))
+    }
+}
 
 #[worker::event(fetch)]
 async fn fetch(
@@ -48,10 +85,13 @@ async fn fetch(
     headers.append("Content-Type", "application/octet-stream")?;
     headers.append("Transfer-Encoding", "chunked")?;
 
-    let stream = object
-        .into_stream()
-        .map_err(|e| worker::Error::RustError(e.to_string()));
-    worker::Response::from_stream(stream).map(|resp| resp.with_headers(headers))
+    // Retrieve the stored ReadableStream from the global variable
+    let stream = take_global_stream()
+        .ok_or_else(|| worker::Error::RustError("No stream available".to_string()))?;
+
+    Ok(worker::ResponseBuilder::new()
+        .stream(stream)
+        .with_headers(headers))
 }
 
 struct WrappedRequest(hyper::Request<s3s::Body>);
@@ -79,13 +119,6 @@ impl From<WrappedRequest> for HyperRequest<s3s::Body> {
         req.0
     }
 }
-
-#[derive(Debug, Clone)]
-struct WrappedStream {
-    stream: ReadableStream,
-}
-unsafe impl Send for WrappedStream {}
-unsafe impl Sync for WrappedStream {}
 
 #[derive(Debug)]
 struct FetchService;
@@ -119,6 +152,9 @@ impl FetchService {
                         _ => todo!(),
                     };
 
+                    // Store the stream globally so we can access it later
+                    set_global_stream(stream.clone());
+
                     // Convert headers to http::HeaderMap
                     let mut header_map = http::HeaderMap::new();
                     for (key, value) in headers.entries() {
@@ -139,9 +175,6 @@ impl FetchService {
                     let body = HttpResponseBody::new(Full::new(dummy_body).map_err(|e| match e {}));
 
                     let mut http_response = HttpResponse::from_parts(parts, body);
-                    http_response.extensions_mut().insert(WrappedStream {
-                        stream: stream.clone(),
-                    });
                     Ok(http_response)
                 }
                 Err(e) => Err(HttpError::new(HttpErrorKind::Unknown, e)),

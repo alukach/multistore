@@ -3,11 +3,11 @@ use s3s::auth::{Credentials, S3Auth, SecretKey};
 use s3s::{S3Error, S3Result};
 use std::collections::HashMap;
 
-pub struct StaticCredentialsRegistry {
+pub struct InMemoryCredentialsRegistry {
     credentials: HashMap<String, UserCredentials>,
 }
 
-impl StaticCredentialsRegistry {
+impl InMemoryCredentialsRegistry {
     pub fn from_yaml(path: &str) -> Self {
         let file = std::fs::File::open(path).unwrap();
         let reader = std::io::BufReader::new(file);
@@ -40,7 +40,7 @@ impl StaticCredentialsRegistry {
 }
 
 #[async_trait::async_trait]
-impl S3Auth for StaticCredentialsRegistry {
+impl S3Auth for InMemoryCredentialsRegistry {
     async fn get_secret_key(&self, access_key: &str) -> S3Result<SecretKey> {
         if let Some(user_creds) = self.credentials.get(access_key) {
             return Ok(user_creds.credentials.secret_key.clone());

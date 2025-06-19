@@ -4,11 +4,11 @@ use s3s::dto;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone)]
-pub struct StaticDataSourceRegistry {
+pub struct InMemoryDataSourceRegistry {
     data_sources: Vec<DataSource>,
 }
 
-impl StaticDataSourceRegistry {
+impl InMemoryDataSourceRegistry {
     /// Create with inputted data sources
     pub fn from_data_sources(data_sources: Vec<DataSource>) -> Self {
         Self { data_sources }
@@ -50,6 +50,7 @@ impl StaticDataSourceRegistry {
                     region,
                     creation_date,
                     credentials,
+                    http_connector: None,
                 }
             })
             .collect();
@@ -58,7 +59,7 @@ impl StaticDataSourceRegistry {
 }
 
 #[async_trait::async_trait]
-impl DataSourceRegistry for StaticDataSourceRegistry {
+impl DataSourceRegistry for InMemoryDataSourceRegistry {
     async fn list_data_sources(
         &self,
         _access_key: Option<&String>,

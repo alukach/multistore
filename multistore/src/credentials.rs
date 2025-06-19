@@ -1,7 +1,7 @@
 /// Tooling to track user credentials.
 use s3s::auth::Credentials;
 
-pub mod static_auth;
+pub mod in_memory;
 
 #[derive(Debug, Clone)]
 struct UserCredentials {

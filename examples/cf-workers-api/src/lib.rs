@@ -1,70 +1,100 @@
 use bytes::Bytes;
 use console_error_panic_hook;
-use futures_util::TryStreamExt;
 use http;
 use http_body_util::BodyExt;
 use http_body_util::Full;
+use hyper::Request as HyperRequest;
+use multistore::credentials::static_auth::StaticCredentialsRegistry;
+use multistore::data_source::static_db::StaticDataSourceRegistry;
+use multistore::s3::S3Interface;
 use object_store::{
-    aws::{AmazonS3Builder, AwsCredential},
+    aws::AwsCredential,
     client::{
         ClientOptions, HttpClient, HttpConnector, HttpError, HttpErrorKind, HttpRequest,
         HttpResponse, HttpResponseBody, HttpService,
     },
-    path::Path,
-    ObjectStore, Result as ObjectStoreResult,
+    Result as ObjectStoreResult,
 };
+use s3s::service::S3ServiceBuilder;
+use s3s::Body;
+use web_sys::ReadableStream;
 use worker::{
-    async_trait, console_log, event, Context, Env, Fetch, Method, Request, Response,
-    Result as CfResult,
+    async_trait, event, Context, Env, Fetch, Method, Request, Response, Result as CfResult,
 };
 
 #[event(fetch)]
-async fn fetch(_req: Request, _env: Env, _ctx: Context) -> CfResult<Response> {
+async fn fetch(req: Request, _env: Env, _ctx: Context) -> CfResult<Response> {
+    // Initialize panic hook for better error messages
     console_error_panic_hook::set_once();
 
-    let credentials = get_credentials();
-    console_log!("credentials: {:?}", credentials);
-
-    let client = HttpClient::new(FetchService);
-
-    let store = AmazonS3Builder::new()
-        .with_bucket_name("overturemaps-us-west-2")
-        .with_region("us-west-2")
-        .with_access_key_id(credentials.key_id)
-        .with_secret_access_key(credentials.secret_key)
-        .with_http_connector(FetchConnector::new(client))
-        .build()
-        .unwrap();
-
-    let object = store.get(&Path::from("release/2025-05-21.0/theme=buildings/type=building/part-00006-0df994ca-3323-4d7c-a374-68c653f78289-c000.zstd.parquet")).await.unwrap();
-
-    let mut headers = worker::Headers::new();
-    headers.append("Content-Type", "application/octet-stream")?;
-    headers.append("Transfer-Encoding", "chunked")?;
-
-    let stream = object
-        .into_stream()
-        .map_err(|e| worker::Error::RustError(e.to_string()));
-
-    Response::from_stream(stream).map(|resp| resp.with_headers(headers))
-}
-
-fn get_credentials() -> AwsCredential {
     let config: serde_yaml::Value =
         serde_yaml::from_str(include_str!("../../../database.yaml")).unwrap();
-    let data_sources = config["data-sources"].as_sequence().unwrap();
-    AwsCredential {
-        key_id: data_sources[0]["credentials"]["access_key_id"]
-            .as_str()
-            .unwrap()
-            .to_string(),
-        secret_key: data_sources[0]["credentials"]["secret_access_key"]
-            .as_str()
-            .unwrap()
-            .to_string(),
-        token: None,
+
+    let creds_registry = StaticCredentialsRegistry::from_serde(config.clone());
+    let data_source_registry = StaticDataSourceRegistry::from_serde(config.clone());
+    let s3_backend = S3Interface::new(data_source_registry);
+
+    let service = {
+        let mut builder = S3ServiceBuilder::new(s3_backend);
+        builder.set_auth(creds_registry);
+        builder.build()
+    };
+
+    // Convert the request and handle it
+    let res = service
+        .call(WrappedRequest::from(req).into())
+        .await
+        .map_err(|e| worker::Error::RustError(e.to_string()))?;
+
+    let stream: ReadableStream = if let Some(stream) = res.extensions().get::<WrappedStream>() {
+        stream.stream.clone()
+    } else {
+        panic!("No stream found");
+    };
+    let response = Response::builder().stream(stream);
+    Ok(response)
+}
+
+struct WrappedRequest(hyper::Request<s3s::Body>);
+
+impl From<Request> for WrappedRequest {
+    fn from(req: Request) -> Self {
+        let mut hyper_req = hyper::Request::new(s3s::Body::empty());
+        *hyper_req.method_mut() =
+            hyper::Method::from_bytes(req.method().to_string().as_bytes()).unwrap();
+        // *hyper_req.uri_mut() = hyper::Uri::from_static(&req.url().unwrap().to_string());
+        // *hyper_req.headers_mut() =
+        //     hyper::HeaderMap::from_iter(req.headers().entries().map(|(key, value)| {
+        //         (
+        //             hyper::Head::from_bytes(key.as_bytes()).unwrap(),
+        //             hyper::HeaderValue::from_str(value).unwrap(),
+        //         )
+        //     }));
+        // TODO: add body
+        Self(hyper_req)
     }
 }
+
+impl From<WrappedRequest> for HyperRequest<s3s::Body> {
+    fn from(req: WrappedRequest) -> Self {
+        req.0
+    }
+}
+
+// struct ApiError(S3Error);
+
+// impl From<ApiError> for worker::Error {
+//     fn from(e: ApiError) -> Self {
+//         worker::Error::RustError(e.0.to_string())
+//     }
+// }
+
+#[derive(Debug, Clone)]
+struct WrappedStream {
+    stream: ReadableStream,
+}
+unsafe impl Send for WrappedStream {}
+unsafe impl Sync for WrappedStream {}
 
 #[derive(Debug)]
 struct FetchService;
@@ -92,7 +122,11 @@ impl FetchService {
             let result = match res_fut.await {
                 Ok(response) => {
                     let status = response.status_code();
-                    let headers = response.headers();
+                    let headers: &worker::Headers = response.headers();
+                    let stream = match response.body() {
+                        worker::ResponseBody::Stream(body) => body,
+                        _ => todo!(),
+                    };
 
                     // Convert headers to http::HeaderMap
                     let mut header_map = http::HeaderMap::new();
@@ -113,7 +147,11 @@ impl FetchService {
                     let dummy_body: Bytes = Bytes::from("Dummy Body");
                     let body = HttpResponseBody::new(Full::new(dummy_body).map_err(|e| match e {}));
 
-                    Ok(HttpResponse::from_parts(parts, body))
+                    let mut http_response = HttpResponse::from_parts(parts, body);
+                    http_response.extensions_mut().insert(WrappedStream {
+                        stream: stream.clone(),
+                    });
+                    Ok(http_response)
                 }
                 Err(e) => Err(HttpError::new(HttpErrorKind::Unknown, e)),
             };
@@ -129,22 +167,5 @@ impl FetchService {
 impl HttpService for FetchService {
     async fn call(&self, req: HttpRequest) -> Result<HttpResponse, HttpError> {
         self.fetch(req).await
-    }
-}
-/// [`HttpConnector`] using [`Fetch`]
-#[derive(Debug)]
-pub struct FetchConnector {
-    client: HttpClient,
-}
-
-impl FetchConnector {
-    pub fn new(client: HttpClient) -> Self {
-        Self { client }
-    }
-}
-
-impl HttpConnector for FetchConnector {
-    fn connect(&self, _options: &ClientOptions) -> ObjectStoreResult<HttpClient> {
-        Ok(self.client.clone())
     }
 }

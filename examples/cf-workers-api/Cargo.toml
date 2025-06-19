@@ -30,6 +30,7 @@ serde_yaml = "0.9.34"
 web-sys = "0.3.77"
 worker = {version = "0.5.0", features = ["http"]}
 worker-macros = {version = "0.5.0", features = ["http"]}
+hyper = "1.6.0"
 
 [dependencies.getrandom_v03]
 features = ["wasm_js"]

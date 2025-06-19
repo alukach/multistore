@@ -1,64 +1,63 @@
 use bytes::Bytes;
 use console_error_panic_hook;
+use futures::TryStreamExt;
 use http;
 use http_body_util::BodyExt;
 use http_body_util::Full;
 use hyper::Request as HyperRequest;
-use multistore::credentials::static_auth::StaticCredentialsRegistry;
-use multistore::data_source::static_db::StaticDataSourceRegistry;
-use multistore::s3::S3Interface;
 use object_store::{
-    aws::AwsCredential,
+    aws::{AmazonS3Builder, AwsCredential},
     client::{
         ClientOptions, HttpClient, HttpConnector, HttpError, HttpErrorKind, HttpRequest,
         HttpResponse, HttpResponseBody, HttpService,
     },
-    Result as ObjectStoreResult,
+    path::Path,
+    ObjectStore, Result as ObjectStoreResult,
 };
-use s3s::service::S3ServiceBuilder;
-use s3s::Body;
 use web_sys::ReadableStream;
-use worker::{
-    async_trait, event, Context, Env, Fetch, Method, Request, Response, Result as CfResult,
-};
 
-#[event(fetch)]
-async fn fetch(req: Request, _env: Env, _ctx: Context) -> CfResult<Response> {
+#[worker::event(fetch)]
+async fn fetch(
+    _req: worker::Request,
+    _env: worker::Env,
+    _ctx: worker::Context,
+) -> worker::Result<worker::Response> {
     // Initialize panic hook for better error messages
     console_error_panic_hook::set_once();
 
-    let config: serde_yaml::Value =
-        serde_yaml::from_str(include_str!("../../../database.yaml")).unwrap();
+    let credentials = get_credentials();
+    worker::console_log!("credentials: {:?}", credentials);
 
-    let creds_registry = StaticCredentialsRegistry::from_serde(config.clone());
-    let data_source_registry = StaticDataSourceRegistry::from_serde(config.clone());
-    let s3_backend = S3Interface::new(data_source_registry);
+    let client = HttpClient::new(FetchService);
 
-    let service = {
-        let mut builder = S3ServiceBuilder::new(s3_backend);
-        builder.set_auth(creds_registry);
-        builder.build()
-    };
+    let store = AmazonS3Builder::new()
+        .with_bucket_name("overturemaps-us-west-2")
+        .with_region("us-west-2")
+        .with_access_key_id(credentials.key_id)
+        .with_secret_access_key(credentials.secret_key)
+        .with_http_connector(FetchConnector {})
+        .build()
+        .unwrap();
 
-    // Convert the request and handle it
-    let res = service
-        .call(WrappedRequest::from(req).into())
+    let object = store
+        .get(&Path::from("/release/2025-05-21.0/theme=buildings/type=building/part-00006-0df994ca-3323-4d7c-a374-68c653f78289-c000.zstd.parquet"))
         .await
         .map_err(|e| worker::Error::RustError(e.to_string()))?;
 
-    let stream: ReadableStream = if let Some(stream) = res.extensions().get::<WrappedStream>() {
-        stream.stream.clone()
-    } else {
-        panic!("No stream found");
-    };
-    let response = Response::builder().stream(stream);
-    Ok(response)
+    let mut headers = worker::Headers::new();
+    headers.append("Content-Type", "application/octet-stream")?;
+    headers.append("Transfer-Encoding", "chunked")?;
+
+    let stream = object
+        .into_stream()
+        .map_err(|e| worker::Error::RustError(e.to_string()));
+    worker::Response::from_stream(stream).map(|resp| resp.with_headers(headers))
 }
 
 struct WrappedRequest(hyper::Request<s3s::Body>);
 
-impl From<Request> for WrappedRequest {
-    fn from(req: Request) -> Self {
+impl From<worker::Request> for WrappedRequest {
+    fn from(req: worker::Request) -> Self {
         let mut hyper_req = hyper::Request::new(s3s::Body::empty());
         *hyper_req.method_mut() =
             hyper::Method::from_bytes(req.method().to_string().as_bytes()).unwrap();
@@ -81,14 +80,6 @@ impl From<WrappedRequest> for HyperRequest<s3s::Body> {
     }
 }
 
-// struct ApiError(S3Error);
-
-// impl From<ApiError> for worker::Error {
-//     fn from(e: ApiError) -> Self {
-//         worker::Error::RustError(e.0.to_string())
-//     }
-// }
-
 #[derive(Debug, Clone)]
 struct WrappedStream {
     stream: ReadableStream,
@@ -104,9 +95,9 @@ impl FetchService {
         use futures::channel::oneshot;
         use worker::wasm_bindgen_futures::spawn_local;
 
-        let req = match Request::new(
+        let req = match worker::Request::new(
             req.uri().to_string().as_str(),
-            Method::from(req.method().to_string()),
+            worker::Method::from(req.method().to_string()),
         ) {
             Ok(req) => req,
             Err(e) => {
@@ -117,7 +108,7 @@ impl FetchService {
         let (tx, rx) = oneshot::channel();
 
         spawn_local(async move {
-            let fetch_request = Fetch::Request(req);
+            let fetch_request = worker::Fetch::Request(req);
             let res_fut = fetch_request.send();
             let result = match res_fut.await {
                 Ok(response) => {
@@ -163,9 +154,36 @@ impl FetchService {
     }
 }
 
-#[async_trait::async_trait]
+#[worker::async_trait::async_trait]
 impl HttpService for FetchService {
     async fn call(&self, req: HttpRequest) -> Result<HttpResponse, HttpError> {
         self.fetch(req).await
+    }
+}
+
+#[derive(Debug, Default)]
+struct FetchConnector {}
+
+impl HttpConnector for FetchConnector {
+    fn connect(&self, _options: &ClientOptions) -> ObjectStoreResult<HttpClient> {
+        let client = FetchService {};
+        Ok(HttpClient::new(client))
+    }
+}
+
+fn get_credentials() -> AwsCredential {
+    let config: serde_yaml::Value =
+        serde_yaml::from_str(include_str!("../../../database.yaml")).unwrap();
+    let data_sources = config["data-sources"].as_sequence().unwrap();
+    AwsCredential {
+        key_id: data_sources[0]["credentials"]["access_key_id"]
+            .as_str()
+            .unwrap()
+            .to_string(),
+        secret_key: data_sources[0]["credentials"]["secret_access_key"]
+            .as_str()
+            .unwrap()
+            .to_string(),
+        token: None,
     }
 }

@@ -1,1 +1,0 @@
-This folder contains the built output assets for the worker "cf-workers-api" generated at 2025-06-14T05:12:02.300Z.

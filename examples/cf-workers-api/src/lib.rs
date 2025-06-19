@@ -67,19 +67,6 @@ fn get_credentials() -> AwsCredential {
 }
 
 #[derive(Debug)]
-struct WrappedResponse {
-    response: Response,
-}
-unsafe impl Send for WrappedResponse {}
-unsafe impl Sync for WrappedResponse {}
-
-impl WrappedResponse {
-    pub fn new(response: Response) -> Self {
-        Self { response }
-    }
-}
-
-#[derive(Debug)]
 struct FetchService;
 
 impl FetchService {

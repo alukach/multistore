@@ -40,12 +40,6 @@ impl FetchService {
             if let worker::ResponseBody::Stream(body) = response.body() {
                 // Store the stream globally so we can access it later
                 set_global_stream(body.clone());
-            } else {
-                let _ = tx.send(Err(HttpError::new(
-                    HttpErrorKind::Unknown,
-                    io::Error::new(io::ErrorKind::Other, "Expected stream body"),
-                )));
-                return;
             }
 
             let (mut parts, _) = http::Response::new(()).into_parts();

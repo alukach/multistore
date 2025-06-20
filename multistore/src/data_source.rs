@@ -99,7 +99,7 @@ impl TryFrom<DataSource> for (Arc<dyn ObjectStore>, Path) {
 
                 // Apply HTTP connector if provided
                 if let Some(connector) = source.http_connector {
-                    builder = builder.with_http_connector(connector.as_ref());
+                    builder = builder.with_http_connector(ArcHttpConnector(connector));
                 }
 
                 Box::new(builder.build()?) as Box<dyn ObjectStore>
@@ -116,9 +116,22 @@ impl TryFrom<DataSource> for (Arc<dyn ObjectStore>, Path) {
     }
 }
 
+#[derive(Debug)]
+struct ArcHttpConnector(Arc<dyn HttpConnector>);
+
+impl HttpConnector for ArcHttpConnector {
+    fn connect(
+        &self,
+        options: &object_store::ClientOptions,
+    ) -> object_store::Result<object_store::client::HttpClient> {
+        self.0.connect(options)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use object_store::client::ReqwestConnector;
     use std::collections::HashMap;
 
     fn create_test_source() -> DataSource {

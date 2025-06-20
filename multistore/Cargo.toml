@@ -20,6 +20,7 @@ time = "0.3.41"
 tracing = "0.1.41"
 tracing-error = "0.2.1"
 url = "2.5.4"
+web-sys = "0.3.77"
 
 [dev-dependencies]
 tokio = {version = "1.36", features = []}

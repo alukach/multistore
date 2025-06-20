@@ -3,21 +3,23 @@ use http;
 use http_body_util::{BodyExt, Full};
 use object_store::{
     client::{
-        HttpClient, HttpConnector, HttpError, HttpErrorKind, HttpRequest, HttpResponse,
-        HttpResponseBody, HttpService,
+        HttpClient, HttpConnector, HttpError, HttpErrorKind, HttpRequest, HttpResponseBody,
+        HttpService,
     },
-    ClientOptions, Result as ObjectStoreResult,
+    ClientOptions,
 };
 use std::io;
+use web_sys::ReadableStream;
 use worker;
-
-use crate::stream::set_global_stream;
 
 #[derive(Debug)]
 pub struct FetchService;
 
 impl FetchService {
-    pub async fn fetch(&self, req: worker::Request) -> Result<HttpResponse, HttpError> {
+    pub async fn fetch(
+        &self,
+        req: worker::Request,
+    ) -> Result<object_store::client::HttpResponse, HttpError> {
         use futures::channel::oneshot;
         use worker::wasm_bindgen_futures::spawn_local;
 
@@ -63,7 +65,7 @@ impl FetchService {
             let body =
                 HttpResponseBody::new(Full::new(Bytes::from("Dummy Body")).map_err(|e| match e {}));
 
-            let http_response = HttpResponse::from_parts(parts, body);
+            let http_response = object_store::client::HttpResponse::from_parts(parts, body);
             let _ = tx.send(Ok(http_response));
         });
 
@@ -73,7 +75,10 @@ impl FetchService {
 
 #[worker::async_trait::async_trait]
 impl HttpService for FetchService {
-    async fn call(&self, req: HttpRequest) -> Result<HttpResponse, HttpError> {
+    async fn call(
+        &self,
+        req: HttpRequest,
+    ) -> Result<object_store::client::HttpResponse, HttpError> {
         let req = match worker::Request::new(
             req.uri().to_string().as_str(),
             worker::Method::from(req.method().to_string()),
@@ -87,12 +92,26 @@ impl HttpService for FetchService {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FetchConnector {}
 
 impl HttpConnector for FetchConnector {
-    fn connect(&self, _options: &ClientOptions) -> ObjectStoreResult<HttpClient> {
+    fn connect(&self, _options: &ClientOptions) -> object_store::Result<HttpClient> {
         let client = FetchService {};
         Ok(HttpClient::new(client))
     }
+}
+
+// Global storage for the ReadableStream - safe in single-threaded WASM
+static mut GLOBAL_STREAM: Option<ReadableStream> = None;
+
+// Helper functions to safely access the global stream
+fn set_global_stream(stream: ReadableStream) {
+    unsafe {
+        GLOBAL_STREAM = Some(stream);
+    }
+}
+
+pub fn take_global_stream() -> Option<ReadableStream> {
+    unsafe { GLOBAL_STREAM.take() }
 }

@@ -1,6 +1,8 @@
 use crate::data_source::{DataSource, DataSourceRegistry};
 use crate::error::{Error, Result};
+use object_store::client::HttpConnector;
 use s3s::dto;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone)]
@@ -55,6 +57,19 @@ impl InMemoryDataSourceRegistry {
             })
             .collect();
         Self { data_sources }
+    }
+
+    /// Set an HTTP connector on all data sources in this registry
+    pub fn with_http_connector<C>(mut self, http_connector: C) -> Self
+    where
+        C: HttpConnector + Clone,
+    {
+        self.data_sources = self
+            .data_sources
+            .into_iter()
+            .map(|ds| ds.with_http_connector(http_connector.clone()))
+            .collect();
+        self
     }
 }
 

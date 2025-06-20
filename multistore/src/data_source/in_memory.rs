@@ -2,7 +2,6 @@ use crate::data_source::{DataSource, DataSourceRegistry};
 use crate::error::{Error, Result};
 use object_store::client::HttpConnector;
 use s3s::dto;
-use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone)]

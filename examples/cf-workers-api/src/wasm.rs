@@ -22,8 +22,6 @@ impl FetchService {
         use futures::channel::oneshot;
         use worker::wasm_bindgen_futures::spawn_local;
 
-        worker::console_debug!("Fetching request");
-
         let (tx, rx) = oneshot::channel();
 
         spawn_local(async move {
@@ -71,18 +69,27 @@ impl FetchService {
 impl HttpService for FetchService {
     async fn call(
         &self,
-        req: HttpRequest,
+        req_in: HttpRequest,
     ) -> Result<object_store::client::HttpResponse, HttpError> {
-        let req = match worker::Request::new(
-            req.uri().to_string().as_str(),
-            worker::Method::from(req.method().to_string()),
+        let req_out = match worker::Request::new(
+            req_in.uri().to_string().as_str(),
+            worker::Method::from(req_in.method().to_string()),
         ) {
-            Ok(req) => req,
+            Ok(mut req_out) => {
+                req_in.headers().iter().for_each(|(key, value)| {
+                    req_out
+                        .headers_mut()
+                        .expect("Failed to get headers")
+                        .set(key.as_str(), value.to_str().unwrap())
+                        .expect("Failed to set header");
+                });
+                req_out
+            }
             Err(e) => {
                 return Err(HttpError::new(HttpErrorKind::Unknown, e));
             }
         };
-        self.fetch(req).await
+        self.fetch(req_out).await
     }
 }
 

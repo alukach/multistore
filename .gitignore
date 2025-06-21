@@ -1,6 +1,12 @@
-/target
-database.yaml
-node_modules
+# Rust artifacts
+target
+build
 dist
-.dev.vars
+
+# Local
+database.yaml
 .DS_Store
+
+# Cloudflare
+node_modules
+.dev.vars

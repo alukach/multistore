@@ -1,16 +1,20 @@
 use bytes::Bytes;
+use futures::SinkExt;
 use futures::StreamExt;
+use futures::channel::mpsc;
+use http_body_util::StreamBody;
+use hyper::body::Frame;
 use object_store::{
+    ClientOptions,
     client::{
         HttpClient, HttpConnector, HttpError, HttpErrorKind, HttpRequest, HttpResponseBody,
         HttpService,
     },
-    ClientOptions,
 };
 use std::cell::RefCell;
 use web_sys::ReadableStream;
 use worker;
-
+use worker::wasm_bindgen_futures::spawn_local;
 #[derive(Debug)]
 pub struct FetchService;
 
@@ -127,11 +131,6 @@ pub fn take_global_stream() -> Option<ReadableStream> {
 }
 /// Helper to convert your ByteStream → HttpResponseBody
 async fn byte_stream_to_http_body(mut stream: worker::ByteStream) -> HttpResponseBody {
-    use futures::channel::mpsc;
-    use futures::SinkExt;
-    use http_body_util::StreamBody;
-    use worker::wasm_bindgen_futures::spawn_local;
-
     let (mut tx, rx) = mpsc::channel(1);
 
     // Spawn a task to read from the ByteStream and send to the channel
@@ -156,7 +155,7 @@ async fn byte_stream_to_http_body(mut stream: worker::ByteStream) -> HttpRespons
 
     // Create a stream that maps the channel receiver to Frame::data
     let safe_stream = rx.map(|chunk| {
-        let frame = hyper::body::Frame::data(Bytes::from(chunk?));
+        let frame = Frame::data(Bytes::from(chunk?));
         Ok(frame)
     });
 

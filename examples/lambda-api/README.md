@@ -35,7 +35,7 @@ For generic events, where you define the event data structure, you can create a 
 
 ```json
 {
-    "command": "test"
+  "command": "test"
 }
 ```
 
@@ -53,5 +53,12 @@ Read more about invoking the function in [the Cargo Lambda documentation for the
 ## Deploying
 
 To deploy the project, run `cargo lambda deploy`. This will create an IAM role and a Lambda function in your AWS account.
+
+```sh
+cargo lambda deploy multistore --binary-name lambda-api --include database.yaml --enable-function-url
+```
+
+> [!NOTE]
+> Lambda Function URLs seem to strip out required authorization headers. Instead, you must manually place an API Gateway in front of the deployed Lambda.
 
 Read more about deploying your lambda function in [the Cargo Lambda documentation](https://www.cargo-lambda.info/commands/deploy.html).

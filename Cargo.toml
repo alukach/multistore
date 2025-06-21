@@ -1,6 +1,3 @@
 [workspace]
-members = [
-  "hyper-api",
-  "lambda-api",
-  "lib",
-]
+members = ["multistore", "examples/*"]
+resolver = "3"

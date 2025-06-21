@@ -5,10 +5,10 @@ use s3s::service::{S3Service, S3ServiceBuilder};
 use std::env;
 use std::sync::Arc;
 
-use lib::credentials::yaml_auth::YAMLCredentialsRegistry;
-use lib::data_source::yaml_db::InMemoryDataSourceRegistry;
-use lib::error::Result;
-use lib::s3::S3Interface;
+use multistore::credentials::in_memory::InMemoryCredentialsRegistry;
+use multistore::data_source::in_memory::InMemoryDataSourceRegistry;
+use multistore::error::Result;
+use multistore::s3::S3Interface;
 use utils::{convert_request, convert_response};
 
 pub static S3_SERVICE: std::sync::OnceLock<Arc<S3Service>> = std::sync::OnceLock::new();
@@ -29,7 +29,7 @@ async fn main() -> Result<(), Error> {
         let current_dir = env::current_dir().expect("Failed to get current directory");
         let db_path = current_dir.join("database.yaml");
         let db_path = db_path.to_str().unwrap();
-        let creds_registry = YAMLCredentialsRegistry::from_yaml(db_path);
+        let creds_registry = InMemoryCredentialsRegistry::from_yaml(db_path);
         let data_source_registry = InMemoryDataSourceRegistry::from_yaml(db_path);
         let s3_backend = S3Interface::new(data_source_registry);
 

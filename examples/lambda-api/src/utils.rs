@@ -1,7 +1,7 @@
 use http_body_util::BodyExt;
 use lambda_http::Error;
 use lambda_http::{Body, Request, Response};
-use lib::error::Result;
+use multistore::error::Result;
 
 pub async fn convert_request(req_in: Request) -> Result<hyper::Request<s3s::Body>, Error> {
     // Clone necessary parts before moving

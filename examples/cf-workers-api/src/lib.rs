@@ -6,7 +6,6 @@ use multistore::credentials::in_memory::InMemoryCredentialsRegistry;
 use multistore::data_source::in_memory::InMemoryDataSourceRegistry;
 use multistore::s3::S3Interface;
 use s3s::{service::S3ServiceBuilder, S3Error, S3ErrorCode};
-use std::sync::Arc;
 
 #[worker::event(fetch)]
 async fn fetch(
@@ -40,13 +39,13 @@ async fn fetch(
     let res = match service.call(req).await {
         Ok(res) => res,
         Err(e) => {
-            worker::console_error!("Error calling service: {:?}", e);
+            worker::console_error!("Received error from S3S service: {:?}", e);
             return Err(S3Error::new(S3ErrorCode::InternalError));
         }
     };
 
     // Build response with ReadableStream
-    let mut headers = {
+    let headers = {
         let mut headers = worker::Headers::new();
         for (key, value) in res.headers().iter() {
             let _ = headers.append(key.as_str(), value.to_str().unwrap());
@@ -56,16 +55,16 @@ async fn fetch(
     let res_with_body = {
         let response = worker::ResponseBuilder::new();
         if let Some(stream) = take_global_stream() {
-            worker::console_log!("Stream found");
-            let _ = headers.append("Content-Type", "application/octet-stream");
-            let _ = headers.append("Transfer-Encoding", "chunked");
+            worker::console_debug!("Stream available, using it as body");
             response.stream(stream)
         } else {
-            worker::console_log!("Stream not found");
+            worker::console_debug!("Stream not available, using s3s response body");
             let body = res.body().bytes().unwrap_or_default();
             response.fixed(body.into())
         }
     };
+    worker::console_log!("Responding with status: {:?}", res.status().as_u16());
+    worker::console_log!("Responding with headers: {:?}", headers);
     Ok(res_with_body
         .with_headers(headers)
         .with_status(res.status().as_u16()))

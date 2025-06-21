@@ -35,15 +35,16 @@ impl FetchService {
             };
 
             // NOTE: We need to clone the response to allow us to send a stream to both
-            // the global and to the handler. It seems that even calling `request.body()`
-            // disturbs the stream, so we need to clone it before that.
+            // the global stream store and to the handler. It seems that even calling
+            // `res.body()` disturbs the stream, so we need to clone it before that.
             let mut res_dup = res.cloned().unwrap();
 
             let body = match res.body() {
                 worker::ResponseBody::Stream(body) => {
                     worker::console_debug!("Found stream body, setting global stream");
                     set_global_stream(body.clone());
-                    byte_stream_to_http_body(res_dup.stream().unwrap()).await
+                    let bytestream = res_dup.stream().unwrap();
+                    byte_stream_to_http_body(bytestream).await
                 }
                 worker::ResponseBody::Body(body) => {
                     worker::console_debug!("Found non-stream body, returning body");

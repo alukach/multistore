@@ -7,6 +7,7 @@ use object_store::{
     },
     ClientOptions,
 };
+use std::cell::RefCell;
 use web_sys::ReadableStream;
 use worker;
 
@@ -95,22 +96,28 @@ impl HttpConnector for FetchConnector {
     }
 }
 
-// Global storage for the ReadableStream - safe in single-threaded WASM
-static mut GLOBAL_STREAM: Option<ReadableStream> = None;
-
-// Helper functions to safely access the global stream
-fn set_global_stream(stream: ReadableStream) {
-    worker::console_debug!("Setting global stream");
-    unsafe {
-        GLOBAL_STREAM = Some(stream);
-    }
+// a thread-local global, initialized to None
+thread_local! {
+    static GLOBAL_STREAM: RefCell<Option<ReadableStream>> = RefCell::new(None);
 }
 
+/// Store it
+pub fn set_global_stream(stream: ReadableStream) {
+    worker::console_debug!("Setting global stream");
+    GLOBAL_STREAM.with(|cell| {
+        // replace the old value, dropping if any
+        cell.replace(Some(stream));
+    });
+}
+
+/// Take it out (leaving None behind)
 pub fn take_global_stream() -> Option<ReadableStream> {
     worker::console_debug!("Taking global stream");
-    unsafe { GLOBAL_STREAM.take() }
+    GLOBAL_STREAM.with(|cell| {
+        // take ownership of the Option, leaving None
+        cell.replace(None)
+    })
 }
-
 /// Helper to convert your ByteStream → HttpResponseBody
 async fn byte_stream_to_http_body(mut stream: worker::ByteStream) -> HttpResponseBody {
     use futures::channel::mpsc;
@@ -137,10 +144,6 @@ async fn byte_stream_to_http_body(mut stream: worker::ByteStream) -> HttpRespons
                     break;
                 }
             }
-        }
-        unsafe {
-            worker::console_debug!("Stream was read, clearing global stream");
-            GLOBAL_STREAM = None;
         }
     });
 

@@ -3,8 +3,8 @@ use crate::data_source::DataSourceRegistry;
 use crate::error::Error;
 use crate::stream::SyncStream;
 use futures_util::TryStreamExt;
-use object_store::ObjectStore;
 use object_store::path::Path;
+use object_store::{GetOptions, ObjectStore};
 use s3s::dto;
 use s3s::dto::StreamingBlob;
 use s3s::{S3, S3Request, S3Response, S3Result};
@@ -128,7 +128,24 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
     ) -> S3Result<S3Response<dto::GetObjectOutput>> {
         let source = self.registry.get_data_source(&req.input.bucket).await?;
         let (object_store, key) = source.as_object_store(Some(req.input.key))?;
-        let object = object_store.get(&key).await.map_err(Error::from)?;
+        let range = match req.input.range {
+            Some(r) => match r {
+                dto::Range::Int { first, last } => match last {
+                    Some(last) => Some(object_store::GetRange::from(first..last)),
+                    None => Some(object_store::GetRange::from(first..)),
+                },
+                dto::Range::Suffix { length } => Some(object_store::GetRange::from(length..)),
+            },
+            None => None,
+        };
+        let opts = GetOptions {
+            range,
+            ..GetOptions::default()
+        };
+        let object = object_store
+            .get_opts(&key, opts)
+            .await
+            .map_err(Error::from)?;
 
         let meta = object.meta.clone();
         let raw_stream = object.into_stream().map_err(Error::from);

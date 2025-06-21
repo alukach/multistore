@@ -203,7 +203,6 @@ dependencies = [
  "bytes",
  "console_error_panic_hook",
  "futures",
- "futures-util",
  "getrandom 0.2.16",
  "getrandom 0.3.3",
  "http",
@@ -211,7 +210,6 @@ dependencies = [
  "hyper",
  "multistore",
  "object_store",
- "reqwest",
  "s3s",
  "serde_yaml",
  "web-sys",
@@ -1106,10 +1104,8 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures-util",
- "js-sys",
  "object_store",
  "s3s",
- "serde_json",
  "serde_yaml",
  "thiserror 2.0.12",
  "time",
@@ -1117,7 +1113,6 @@ dependencies = [
  "tracing",
  "tracing-error",
  "url",
- "web-sys",
 ]
 
 [[package]]

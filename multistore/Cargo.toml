@@ -3,24 +3,18 @@ edition = "2024"
 name = "multistore"
 version = "0.1.0"
 
-[features]
-wasm = ["js-sys"]
-
 [dependencies]
 async-trait = "0.1.88"
 chrono = "0.4.41"
 futures-util = "0.3.31"
-js-sys = {version = "0.3.69", optional = true}
 object_store = {version = "0.12.2", features = ["aws"], default-features = false}
 s3s = {git = "https://github.com/alukach/s3s-wasm.git", branch = "main", package = "s3s"}
-serde_json = "1.0.140"
 serde_yaml = "0.9.34"
 thiserror = "2.0.12"
 time = "0.3.41"
 tracing = "0.1.41"
 tracing-error = "0.2.1"
 url = "2.5.4"
-web-sys = "0.3.77"
 
 [dev-dependencies]
 tokio = {version = "1.36", features = []}

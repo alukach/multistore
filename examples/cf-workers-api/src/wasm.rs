@@ -1,20 +1,11 @@
 use bytes::Bytes;
-use futures::SinkExt;
-use futures::StreamExt;
-use futures::channel::mpsc;
-use http_body_util::StreamBody;
-use hyper::body::Frame;
 use object_store::{
+    client::{HttpClient, HttpConnector, HttpError, HttpErrorKind, HttpRequest, HttpService},
     ClientOptions,
-    client::{
-        HttpClient, HttpConnector, HttpError, HttpErrorKind, HttpRequest, HttpResponseBody,
-        HttpService,
-    },
 };
 use std::cell::RefCell;
 use web_sys::ReadableStream;
 use worker;
-use worker::wasm_bindgen_futures::spawn_local;
 #[derive(Debug)]
 pub struct FetchService;
 
@@ -29,7 +20,7 @@ impl FetchService {
         let (tx, rx) = oneshot::channel();
 
         spawn_local(async move {
-            let mut res = match worker::Fetch::Request(req).send().await {
+            let res = match worker::Fetch::Request(req).send().await {
                 Ok(res) => res,
                 Err(e) => {
                     let _ = tx.send(Err(HttpError::new(HttpErrorKind::Unknown, e)));
@@ -37,17 +28,11 @@ impl FetchService {
                 }
             };
 
-            // NOTE: We need to clone the response to allow us to send a stream to both
-            // the global stream store and to the handler. It seems that even calling
-            // `res.body()` disturbs the stream, so we need to clone it before that.
-            let mut res_dup = res.cloned().unwrap();
-
             let body = match res.body() {
                 worker::ResponseBody::Stream(body) => {
                     worker::console_debug!("Found stream body, setting global stream");
                     set_global_stream(body.clone());
-                    let bytestream = res_dup.stream().unwrap();
-                    byte_stream_to_http_body(bytestream).await
+                    Bytes::new().into() // Use empty bytes for stream body, we'll swap it out for the global stream later
                 }
                 worker::ResponseBody::Body(body) => {
                     worker::console_debug!("Found non-stream body, returning body");
@@ -128,36 +113,4 @@ pub fn take_global_stream() -> Option<ReadableStream> {
         // take ownership of the Option, leaving None
         cell.replace(None)
     })
-}
-/// Helper to convert your ByteStream → HttpResponseBody
-async fn byte_stream_to_http_body(mut stream: worker::ByteStream) -> HttpResponseBody {
-    let (mut tx, rx) = mpsc::channel(1);
-
-    // Spawn a task to read from the ByteStream and send to the channel
-    spawn_local(async move {
-        while let Some(chunk) = stream.next().await {
-            match chunk {
-                Ok(bytes) => {
-                    if let Err(_) = tx.send(Ok(bytes)).await {
-                        // Receiver was dropped, stop processing
-                        break;
-                    }
-                }
-                Err(e) => {
-                    let _ = tx
-                        .send(Err(HttpError::new(HttpErrorKind::Unknown, e)))
-                        .await;
-                    break;
-                }
-            }
-        }
-    });
-
-    // Create a stream that maps the channel receiver to Frame::data
-    let safe_stream = rx.map(|chunk| {
-        let frame = Frame::data(Bytes::from(chunk?));
-        Ok(frame)
-    });
-
-    HttpResponseBody::new(StreamBody::new(safe_stream))
 }

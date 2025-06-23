@@ -47,6 +47,7 @@ impl FetchService {
                     worker::console_debug!("Found stream body, setting global stream");
                     set_global_stream(body.clone());
                     let bytestream = res_dup.stream().unwrap();
+                    // Streams are used in both `ls` and `cp` commands
                     byte_stream_to_http_body(bytestream).await
                 }
                 worker::ResponseBody::Body(body) => {

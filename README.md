@@ -1,5 +1,14 @@
 # MultiStore
 
+MultiStore is an application to easily create an S3-compliant API for one-or-many object store backends.
+
+The system could be utilized to...
+
+1. create custom access credentials (distinct from AWS credentials) to be given out to grant access
+2. collect detailed usage metrics
+3. gate access to datasets
+4. bill users for dataset access
+
 ## Development
 
 ### Running Hyper API

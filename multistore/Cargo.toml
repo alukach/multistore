@@ -1,7 +1,16 @@
 [package]
-edition = "2024"
 name = "multistore"
 version = "0.1.0"
+edition = "2024"
+authors = ["Anthony Lukach <anthonylukach@gmail.com>"]
+description = "S3-compliant API for one-or-many object store backends"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/alukach/multistore"
+homepage = "https://github.com/alukach/multistore"
+documentation = "https://docs.rs/multistore"
+readme = "../README.md"
+keywords = ["s3", "object-store", "storage", "api"]
+categories = ["web-programming", "api-bindings"]
 
 [dependencies]
 async-trait = "0.1.88"

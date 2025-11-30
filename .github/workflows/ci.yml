@@ -3,12 +3,23 @@ name: CI
 on:
   push:
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
 jobs:
   test-library:
     name: Test multistore library
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "multistore"
 
       - name: Run tests
         run: cargo test -p multistore
@@ -25,6 +36,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "multistore"
+
       - name: Build
         run: cargo build -p hyper-api
 
@@ -37,6 +53,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "multistore"
+
       - name: Build
         run: cargo build -p lambda-api
 
@@ -48,6 +69,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "multistore"
+          cache-targets: true
 
       - name: Install wasm32-unknown-unknown target
         run: rustup target add wasm32-unknown-unknown

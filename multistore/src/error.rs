@@ -1,7 +1,6 @@
 use s3s::{S3Error, S3ErrorCode};
 use thiserror::Error;
 
-use tracing::error;
 
 #[derive(Error, Debug)]
 pub enum Error {

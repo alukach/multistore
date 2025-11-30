@@ -46,7 +46,7 @@ async fn fetch(
 
     // Build response with ReadableStream
     let headers = {
-        let mut headers = worker::Headers::new();
+        let headers = worker::Headers::new();
         for (key, value) in res.headers().iter() {
             let _ = headers.append(key.as_str(), value.to_str().unwrap());
         }

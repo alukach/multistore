@@ -17,13 +17,13 @@ use worker;
 use worker::wasm_bindgen_futures::spawn_local;
 
 /// A HttpConnector to configure how object-store makes requests to underlying backends.
-/// Being that we're in WASM, we get binary response bodies in the form of JS 
+/// Being that we're in WASM, we get binary response bodies in the form of JS
 /// ReadableStreams. However, converting that to a Rust Bytestream takes enough CPU that
 /// CloudFlare Workers will abort the request. So, we need to avoid that conversion.
-/// What we do is capture the readable stream in a global variable and return that (if 
+/// What we do is capture the readable stream in a global variable and return that (if
 /// available) rather than the response S3S byte stream to avoid the conversion. This
 /// seems to work.
-/// 
+///
 #[derive(Debug, Default, Clone)]
 pub struct FetchConnector {}
 

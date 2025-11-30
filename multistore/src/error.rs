@@ -1,7 +1,6 @@
 use s3s::{S3Error, S3ErrorCode};
 use thiserror::Error;
 
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Data source not found: {0}")]

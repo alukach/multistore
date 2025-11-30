@@ -8,6 +8,7 @@ use object_store::{GetOptions, ObjectStore};
 use s3s::dto;
 use s3s::dto::StreamingBlob;
 use s3s::{S3, S3Request, S3Response, S3Result};
+use tracing::{debug, instrument};
 
 #[derive(Clone)]
 pub struct S3Interface<T: DataSourceRegistry + Send + Sync + 'static> {
@@ -23,13 +24,15 @@ impl<T: DataSourceRegistry + Send + Sync> S3Interface<T> {
 // TODO: When an object is read, we should emit metrics
 #[async_trait::async_trait]
 impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T> {
+    #[instrument(skip(self, req), fields(access_key = ?req.credentials.as_ref().map(|c| &c.access_key)))]
     async fn list_buckets(
         &self,
         req: S3Request<dto::ListBucketsInput>,
     ) -> S3Result<S3Response<dto::ListBucketsOutput>> {
+        debug!("Listing buckets");
         let access_key = req.credentials.map(|c| c.access_key.clone());
         // TODO: Support req.input.continuation_token,
-        let buckets = self
+        let buckets: Vec<_> = self
             .registry
             .list_data_sources(access_key.as_ref(), req.input)
             .await
@@ -37,6 +40,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
             .map(Into::into)
             .collect();
 
+        debug!(bucket_count = buckets.len(), "Listed buckets successfully");
         Ok(S3Response::new(dto::ListBucketsOutput {
             buckets: Some(buckets),
             owner: None,
@@ -44,12 +48,15 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         }))
     }
 
+    #[instrument(skip(self, req), fields(bucket = %req.input.bucket, prefix = ?req.input.prefix))]
     async fn list_objects_v2(
         &self,
         req: S3Request<dto::ListObjectsV2Input>,
     ) -> S3Result<S3Response<dto::ListObjectsV2Output>> {
+        debug!("Listing objects");
         let source = self.registry.get_data_source(&req.input.bucket).await?;
         let (object_store, prefix) = source.as_object_store(req.input.prefix.clone())?;
+        debug!(%prefix, "Resolved object store path");
 
         let max_keys = req.input.max_keys.unwrap_or(1000) as usize;
         let start_after = req
@@ -84,6 +91,11 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
                 .collect();
 
             let total_items = objects.len() + common_prefixes.len();
+            debug!(
+                objects = objects.len(),
+                prefixes = common_prefixes.len(),
+                "Listed with delimiter"
+            );
             response.contents = Some(objects);
             response.common_prefixes = Some(common_prefixes);
             response.is_truncated = Some(total_items > max_keys);
@@ -99,6 +111,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
                     return Ok(S3Response::new(response));
                 }
             }
+            debug!(objects = objects.len(), truncated = false, "Listed objects");
             response.contents = Some(objects);
             response.is_truncated = Some(false);
         }
@@ -106,13 +119,16 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         Ok(S3Response::new(response))
     }
 
+    #[instrument(skip(self, req), fields(bucket = %req.input.bucket, key = %req.input.key))]
     async fn head_object(
         &self,
         req: S3Request<dto::HeadObjectInput>,
     ) -> S3Result<S3Response<dto::HeadObjectOutput>> {
+        debug!("Getting object metadata");
         let source = self.registry.get_data_source(&req.input.bucket).await?;
         let (object_store, key) = source.as_object_store(Some(req.input.key))?;
         let object = object_store.head(&key).await.map_err(Error::from)?;
+        debug!(size = object.size, "Retrieved object metadata");
         Ok(S3Response::new(dto::HeadObjectOutput {
             content_length: Some(object.size as i64),
             version_id: object.version,
@@ -122,10 +138,12 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         }))
     }
 
+    #[instrument(skip(self, req), fields(bucket = %req.input.bucket, key = %req.input.key, range = ?req.input.range))]
     async fn get_object(
         &self,
         req: S3Request<dto::GetObjectInput>,
     ) -> S3Result<S3Response<dto::GetObjectOutput>> {
+        debug!("Getting object");
         let source = self.registry.get_data_source(&req.input.bucket).await?;
         let (object_store, key) = source.as_object_store(Some(req.input.key))?;
         let range = match req.input.range {
@@ -148,6 +166,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
             .map_err(Error::from)?;
 
         let meta = object.meta.clone();
+        debug!(size = meta.size, "Retrieved object successfully");
         let raw_stream = object.into_stream().map_err(Error::from);
 
         Ok(S3Response::new(dto::GetObjectOutput {

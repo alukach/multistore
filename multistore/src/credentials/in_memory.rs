@@ -2,6 +2,7 @@ use crate::credentials::UserCredentials;
 use s3s::auth::{Credentials, S3Auth, SecretKey};
 use s3s::{S3Error, S3Result};
 use std::collections::HashMap;
+use tracing::{debug, instrument, warn};
 
 pub struct InMemoryCredentialsRegistry {
     credentials: HashMap<String, UserCredentials>,
@@ -41,12 +42,16 @@ impl InMemoryCredentialsRegistry {
 
 #[async_trait::async_trait]
 impl S3Auth for InMemoryCredentialsRegistry {
+    #[instrument(skip(self, access_key), fields(access_key = access_key))]
     async fn get_secret_key(&self, access_key: &str) -> S3Result<SecretKey> {
+        debug!("Looking up secret key");
         if let Some(user_creds) = self.credentials.get(access_key) {
+            debug!("Credentials found");
             return Ok(user_creds.credentials.secret_key.clone());
         }
 
         // No matching credentials found
+        warn!("Invalid access key provided");
         Err(S3Error::new(s3s::S3ErrorCode::InvalidAccessKeyId))
     }
 }

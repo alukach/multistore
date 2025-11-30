@@ -35,6 +35,18 @@ async fn fetch(
     };
 
     // Convert the request and handle it
+    worker::console_log!(
+        "Request: {} {} {}",
+        req.method().to_string(),
+        req.uri().to_string(),
+        req.headers()
+            .get("range")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+            .as_deref()
+            .unwrap_or("(no range)")
+    );
+
     let req = req.map(|body| s3s::Body::http_body(body));
     let res = match service.call(req).await {
         Ok(res) => res,

@@ -662,7 +662,6 @@ name = "hyper-api"
 version = "0.1.0"
 dependencies = [
  "hyper-util",
- "log",
  "multistore",
  "s3s",
  "tokio",

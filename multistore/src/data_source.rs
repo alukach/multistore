@@ -5,6 +5,7 @@ use object_store::{ObjectStore, ObjectStoreScheme};
 use s3s::dto;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::{debug, instrument};
 use url::Url;
 pub mod in_memory;
 
@@ -19,12 +20,15 @@ pub struct DataSource {
 }
 
 impl DataSource {
+    #[instrument(skip(self), fields(name = %self.name, prefix = ?prefix))]
     pub fn as_object_store(self, prefix: Option<String>) -> Result<(Arc<dyn ObjectStore>, Path)> {
+        debug!("Creating object store from data source");
         let (object_store, root_prefix) = self.try_into()?;
         let mut full_path = format!("{}/{}", root_prefix, prefix.unwrap_or_default());
         if full_path.ends_with("/") {
             full_path = full_path.strip_suffix("/").unwrap().to_string();
         }
+        debug!(path = %full_path, "Object store created");
         Ok((object_store, Path::from(full_path)))
     }
 
@@ -93,8 +97,9 @@ impl TryFrom<DataSource> for (Arc<dyn ObjectStore>, Path) {
                 for (key, value) in options {
                     if let Ok(config_key) = key.parse() {
                         builder = builder.with_config(config_key, value);
+                    } else {
+                        tracing::warn!("Unknown option: {key}");
                     }
-                    // Skip unknown keys silently
                 }
 
                 // Apply HTTP connector if provided

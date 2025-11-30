@@ -17,7 +17,7 @@ The system could be utilized to...
 cargo run --bin hyper-api
 ```
 
-### Running Workers API
+### Running Cloudflare Workers API
 
 ```sh
 npx wrangler dev --cwd examples/cf-workers-api

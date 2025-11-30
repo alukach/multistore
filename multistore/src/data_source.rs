@@ -19,6 +19,15 @@ pub struct DataSource {
     http_connector: Option<Arc<dyn HttpConnector>>,
 }
 
+/// Represents a paginated response from listing data sources
+#[derive(Debug, Clone)]
+pub struct DataSourcePage {
+    /// The data sources in this page
+    pub data_sources: Vec<DataSource>,
+    /// Continuation token for fetching the next page, if more results exist
+    pub continuation_token: Option<String>,
+}
+
 impl DataSource {
     #[instrument(skip(self), fields(name = %self.name, prefix = ?prefix))]
     pub fn as_object_store(self, prefix: Option<String>) -> Result<(Arc<dyn ObjectStore>, Path)> {
@@ -52,7 +61,7 @@ pub trait DataSourceRegistry {
         &self,
         access_key: Option<&String>,
         input: dto::ListBucketsInput,
-    ) -> Vec<DataSource>;
+    ) -> DataSourcePage;
 
     async fn get_data_source(&self, name: &str) -> Result<DataSource>;
 }

@@ -21,7 +21,6 @@ impl<T: DataSourceRegistry + Send + Sync> S3Interface<T> {
     }
 }
 
-// TODO: When an object is read, we should emit metrics
 #[async_trait::async_trait]
 impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T> {
     #[instrument(skip(self, req), fields(access_key = ?req.credentials.as_ref().map(|c| &c.access_key)))]
@@ -31,20 +30,25 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
     ) -> S3Result<S3Response<dto::ListBucketsOutput>> {
         debug!("Listing buckets");
         let access_key = req.credentials.map(|c| c.access_key.clone());
-        // TODO: Support req.input.continuation_token,
-        let buckets: Vec<_> = self
-            .registry
-            .list_data_sources(access_key.as_ref(), req.input)
-            .await
-            .into_iter()
-            .map(Into::into)
-            .collect();
 
-        debug!(bucket_count = buckets.len(), "Listed buckets successfully");
+        let page = self
+            .registry
+            .list_data_sources(access_key.as_ref(), req.input.clone())
+            .await;
+
+        let buckets: Vec<_> = page.data_sources.into_iter().map(Into::into).collect();
+
+        debug!(
+            bucket_count = buckets.len(),
+            has_more = page.continuation_token.is_some(),
+            "Listed buckets successfully"
+        );
+
         Ok(S3Response::new(dto::ListBucketsOutput {
             buckets: Some(buckets),
+            continuation_token: page.continuation_token,
             owner: None,
-            ..Default::default()
+            prefix: req.input.prefix,
         }))
     }
 

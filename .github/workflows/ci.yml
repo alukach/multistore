@@ -79,6 +79,9 @@ jobs:
       - name: Install wasm32-unknown-unknown target
         run: rustup target add wasm32-unknown-unknown
 
+      - name: Setup fake database.yaml
+        run: cp database.example.yaml database.yaml
+
       - name: Build for WASM
         run: cargo build -p cf-workers-api --target wasm32-unknown-unknown
 

@@ -5,18 +5,24 @@ use crate::stream::SyncStream;
 use futures_util::TryStreamExt;
 use object_store::path::Path;
 use object_store::{GetOptions, ObjectStore};
-use s3s::dto;
 use s3s::dto::StreamingBlob;
+use s3s::dto::{self, Redirect};
 use s3s::{S3, S3Request, S3Response, S3Result};
+
+#[derive(Clone, Debug)]
+pub struct Settings {
+    pub redirect_to_s3: bool,
+}
 
 #[derive(Clone)]
 pub struct S3Interface<T: DataSourceRegistry + Send + Sync + 'static> {
     registry: T,
+    settings: Settings,
 }
 
 impl<T: DataSourceRegistry + Send + Sync> S3Interface<T> {
-    pub fn new(registry: T) -> Self {
-        Self { registry }
+    pub fn new(registry: T, settings: Settings) -> Self {
+        Self { registry, settings }
     }
 }
 
@@ -128,6 +134,14 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
     ) -> S3Result<S3Response<dto::GetObjectOutput>> {
         let source = self.registry.get_data_source(&req.input.bucket).await?;
         let (object_store, key) = source.as_object_store(Some(req.input.key))?;
+
+        if self.settings.redirect_to_s3 {
+            return Ok(S3Response::new(dto::Redirect {
+                host_name: Some(req.input.bucket),
+                ..Default::default()
+            }));
+        }
+
         let range = match req.input.range {
             Some(r) => match r {
                 dto::Range::Int { first, last } => match last {

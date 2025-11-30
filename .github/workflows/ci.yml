@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+
+jobs:
+  test-library:
+    name: Test multistore library
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: cargo test -p multistore
+
+      - name: Check formatting
+        run: cargo fmt -p multistore --check
+
+      - name: Run clippy
+        run: cargo clippy -p multistore -- -D warnings
+
+  build-hyper-api:
+    name: Build hyper-api example
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: cargo build -p hyper-api
+
+      - name: Run tests
+        run: cargo test -p hyper-api
+
+  build-lambda-api:
+    name: Build lambda-api example
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: cargo build -p lambda-api
+
+      - name: Run tests
+        run: cargo test -p lambda-api
+
+  build-cf-workers-api:
+    name: Build cf-workers-api example
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wasm32-unknown-unknown target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Build for WASM
+        run: cargo build -p cf-workers-api --target wasm32-unknown-unknown
+
+  # Summary job that all checks must pass
+  ci-success:
+    name: CI Success
+    needs:
+      - test-library
+      - build-hyper-api
+      - build-lambda-api
+      - build-cf-workers-api
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs succeeded
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi

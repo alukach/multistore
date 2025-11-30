@@ -2,7 +2,7 @@ use crate::data_source::{DataSource, DataSourcePage, DataSourceRegistry};
 use crate::error::{Error, Result};
 use object_store::client::HttpConnector;
 use s3s::dto;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 #[derive(Clone)]
 pub struct InMemoryDataSourceRegistry {
@@ -43,7 +43,7 @@ impl InMemoryDataSourceRegistry {
                         )
                     })
                     .collect();
-                let creation_date = Some(dto::Timestamp::from(SystemTime::from(UNIX_EPOCH)));
+                let creation_date = Some(dto::Timestamp::from(UNIX_EPOCH));
 
                 DataSource {
                     name,

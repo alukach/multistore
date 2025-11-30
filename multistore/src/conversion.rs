@@ -65,7 +65,7 @@ impl From<&dto::Object> for S3ObjectMeta {
             .last_modified
             .clone()
             .map(|ts| Timestamp::from(ts).0)
-            .unwrap_or(SystemTime::from(UNIX_EPOCH));
+            .unwrap_or(UNIX_EPOCH);
 
         Self(ObjectMeta {
             location: object_store::path::Path::from(object.key.as_deref().unwrap_or("")),
@@ -86,7 +86,7 @@ impl From<S3ObjectMeta> for dto::Object {
             key: Some(meta.0.location.to_string()),
             size: Some(meta.0.size as i64),
             last_modified: Some(Timestamp::from(meta.0.last_modified).into()),
-            e_tag: meta.0.e_tag.map(|s| parse_etag(s)),
+            e_tag: meta.0.e_tag.map(parse_etag),
             ..Default::default()
         }
     }

@@ -136,7 +136,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         Ok(S3Response::new(dto::HeadObjectOutput {
             content_length: Some(object.size as i64),
             version_id: object.version,
-            e_tag: object.e_tag.map(|s| parse_etag(s)),
+            e_tag: object.e_tag.map(parse_etag),
             last_modified: Some(Timestamp::from(object.last_modified).into()),
             ..Default::default()
         }))
@@ -177,7 +177,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
             body: Some(StreamingBlob::wrap(Box::pin(SyncStream(raw_stream)))),
             content_length: Some(meta.size as i64),
             version_id: meta.version,
-            e_tag: meta.e_tag.map(|s| parse_etag(s)),
+            e_tag: meta.e_tag.map(parse_etag),
             last_modified: Some(Timestamp::from(meta.last_modified).into()),
             ..Default::default()
         }))

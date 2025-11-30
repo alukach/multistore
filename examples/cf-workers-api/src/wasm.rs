@@ -1,22 +1,40 @@
 use bytes::Bytes;
+use futures::channel::mpsc;
 use futures::SinkExt;
 use futures::StreamExt;
-use futures::channel::mpsc;
 use http_body_util::StreamBody;
 use hyper::body::Frame;
 use object_store::{
-    ClientOptions,
     client::{
         HttpClient, HttpConnector, HttpError, HttpErrorKind, HttpRequest, HttpResponseBody,
         HttpService,
     },
+    ClientOptions,
 };
 use std::cell::RefCell;
 use web_sys::ReadableStream;
 use worker;
 use worker::wasm_bindgen_futures::spawn_local;
+
+/// A HttpConnector to configure how object-store makes requests to underlying backends.
+/// Being that we're in WASM, we get binary response bodies in the form of JS 
+/// ReadableStreams. However, converting that to a Rust Bytestream takes enough CPU that
+/// CloudFlare Workers will abort the request. So, we need to avoid that conversion.
+/// What we do is capture the readable stream in a global variable and return that (if 
+/// available) rather than the response S3S byte stream to avoid the conversion. This
+/// seems to work.
+/// 
+#[derive(Debug, Default, Clone)]
+pub struct FetchConnector {}
+
+impl HttpConnector for FetchConnector {
+    fn connect(&self, _options: &ClientOptions) -> object_store::Result<HttpClient> {
+        Ok(HttpClient::new(FetchService {}))
+    }
+}
+
 #[derive(Debug)]
-pub struct FetchService;
+struct FetchService;
 
 impl FetchService {
     pub async fn fetch(
@@ -47,7 +65,7 @@ impl FetchService {
                     worker::console_debug!("Found stream body, setting global stream");
                     set_global_stream(body.clone());
                     let bytestream = res_dup.stream().unwrap();
-                    // Streams are used in both `ls` and `cp` commands
+                    // NOTE: Streams are used in both `ls` and `cp` commands
                     byte_stream_to_http_body(bytestream).await
                 }
                 worker::ResponseBody::Body(body) => {
@@ -95,16 +113,6 @@ impl HttpService for FetchService {
             }
         };
         self.fetch(req_out).await
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct FetchConnector {}
-
-impl HttpConnector for FetchConnector {
-    fn connect(&self, _options: &ClientOptions) -> object_store::Result<HttpClient> {
-        let client = FetchService {};
-        Ok(HttpClient::new(client))
     }
 }
 

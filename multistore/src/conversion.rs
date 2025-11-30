@@ -71,7 +71,10 @@ impl From<&dto::Object> for S3ObjectMeta {
             location: object_store::path::Path::from(object.key.as_deref().unwrap_or("")),
             last_modified: last_modified.into(),
             size: object.size.unwrap_or(0) as u64,
-            e_tag: object.e_tag.clone(),
+            e_tag: object.e_tag.as_ref().map(|etag| match etag {
+                dto::ETag::Strong(value) => format!("\"{}\"", value),
+                dto::ETag::Weak(value) => format!("W/\"{}\"", value),
+            }),
             version: None,
         })
     }
@@ -83,7 +86,7 @@ impl From<S3ObjectMeta> for dto::Object {
             key: Some(meta.0.location.to_string()),
             size: Some(meta.0.size as i64),
             last_modified: Some(Timestamp::from(meta.0.last_modified).into()),
-            e_tag: meta.0.e_tag,
+            e_tag: meta.0.e_tag.map(|s| parse_etag(s)),
             ..Default::default()
         }
     }
@@ -112,5 +115,15 @@ where
 {
     fn convert(self) -> U {
         self.into()
+    }
+}
+
+pub fn parse_etag(s: String) -> dto::ETag {
+    if let Some(stripped) = s.strip_prefix("W/\"").and_then(|s| s.strip_suffix('"')) {
+        dto::ETag::Weak(stripped.to_string())
+    } else if let Some(stripped) = s.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+        dto::ETag::Strong(stripped.to_string())
+    } else {
+        dto::ETag::Strong(s)
     }
 }

@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 lambda_http = "0.13.0"
 multistore = { path = "../../multistore" }
-s3s = { git = "https://github.com/alukach/s3s-wasm.git", branch = "main", package = "s3s" }
+s3s = {version = "0.12.0-dev"}
 tokio = { version = "1", features = ["macros"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }

@@ -1,4 +1,4 @@
-use crate::conversion::{S3ObjectMeta, Timestamp};
+use crate::conversion::{S3ObjectMeta, Timestamp, parse_etag};
 use crate::data_source::DataSourceRegistry;
 use crate::error::Error;
 use crate::stream::SyncStream;
@@ -116,7 +116,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
         Ok(S3Response::new(dto::HeadObjectOutput {
             content_length: Some(object.size as i64),
             version_id: object.version,
-            e_tag: object.e_tag,
+            e_tag: object.e_tag.map(|s| parse_etag(s)),
             last_modified: Some(Timestamp::from(object.last_modified).into()),
             ..Default::default()
         }))
@@ -154,7 +154,7 @@ impl<T: DataSourceRegistry + Send + Sync + Clone + 'static> S3 for S3Interface<T
             body: Some(StreamingBlob::wrap(Box::pin(SyncStream(raw_stream)))),
             content_length: Some(meta.size as i64),
             version_id: meta.version,
-            e_tag: meta.e_tag,
+            e_tag: meta.e_tag.map(|s| parse_etag(s)),
             last_modified: Some(Timestamp::from(meta.last_modified).into()),
             ..Default::default()
         }))
